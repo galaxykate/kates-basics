@@ -1,0 +1,53 @@
+body {
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+
+#app {
+ z-index: 50;
+ flex: 1; /* To allow the container to grow and consume the available space */
+ display: flex;
+ flex-direction: column;
+ overflow: hidden;
+}
+
+main {
+  flex: 1; /* To allow main to grow and consume the available space */
+
+}
+
+.canvas-holder {
+  position: relative;
+  background-color: grey;
+}
+
+
+button {
+  font-size: 16px;
+  margin: 2px;
+}
+
+button.active {
+  background-color: hsl(100, 100%, 50%);
+}
+
+
+canvas {
+  position: relative;
+  margin: 10px;
+  border: 1px solid rgba(0, 0, 0, .2);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, .5);
+}
+

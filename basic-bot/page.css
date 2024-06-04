@@ -1,0 +1,90 @@
+
+html,body {
+	width: 100%;
+	height: 100%;
+	margin: 0px;
+	overflow: hidden;
+	font-family: 'Dosis', sans-serif;
+}
+
+html {
+ background-image: url('retina_wood.png');
+  background-repeat: repeat;
+  /* Set specific dimensions */
+/*  background-size: 100px 100px; /* This will tile the image in 100px by 100px segments */*/
+}
+
+#app {
+	width: 100%;
+	height: 100%;
+}
+
+.bot-area {
+	height: 90%;
+	width: 500px;
+	background-color: WhiteSmoke;
+	margin: 6px auto;
+	overflow: hidden;
+
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 6vw; /* Larger font size on small screens */
+  }
+
+  .bot-area {
+    width: 95%; /* Use more of the screen's width */
+  }
+
+  .message {
+    font-size: 5vw; /* Adjust message font size */
+  }
+}
+
+h1 {
+	font-size: 4vw;
+  	font-size: min(4vw, 24px); /* Ensures font size does not go below 24px */
+	font-family: "Madimi One", sans-serif;
+}
+
+
+
+
+.header {
+	z-index: 10;
+	box-shadow: 1px 2px 3px rgba(0, 0, 0, .3);
+	text-align: center;
+}
+
+.messages {
+	z-index: 0;
+	position: relative;
+	overflow: scroll;
+	flex: 1;
+	scroll-behavior: smooth;
+}
+
+
+.message-row {
+	margin: 3px;
+	text-align: center;
+}
+
+.message {
+	padding: 3px 4px;
+	border-radius: 10px;
+	box-shadow: 1px 1px 3px rgba(0, 0, 0, .3);
+	display: inline-block;
+}
+
+.footer {
+	padding: 3px;
+	z-index: 10;
+	box-shadow: 1px 2px 3px rgba(0, 0, 0, .3);
+	text-align: center;
+}
