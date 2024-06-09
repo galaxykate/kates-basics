@@ -1,5 +1,52 @@
 // Utilities
 
+function forEachInObj({obj, fxn, path=[], parent, key}) {
+    if (!isNaN(obj)) {
+        fxn({
+            val:obj, 
+            path,
+            parent,
+            key,
+        })
+    }
+    else if (Array.isArray(obj))
+        obj.forEach((val,index) => forEachInObj({
+            fxn, 
+            obj:val, 
+            path:path.concat([index]),
+            parent: obj,
+            key: index
+        }))
+    else if (typeof obj === "object")
+        Object.entries(obj).forEach(([key,val]) => forEachInObj({
+            fxn, 
+            obj:val, 
+            path:path.concat([key]),
+            parent: obj,
+            key: key
+        }))
+    else {
+        console.log(path,typeof obj)
+    }
+}
+
+function getFromPath(obj, path) {
+    path.forEach(key => {
+        let uidObj = obj.getObjectByUID?.(key)
+        obj = uidObj === undefined?obj[key]:uidObj
+    })
+    return obj
+}
+
+
+function setAtPath(obj, path, val) {
+    let lastKey = path[path.length - 1]
+    let subPath = path.slice(0, path.length - 1)
+    let lastObj = getFromPath(obj, subPath)
+    lastObj[lastKey] = val
+}
+
+
 class InputFlight {
     // Path a touch takes and what happens during it
     // Generalizes to start-stop button presses as well as
@@ -19,7 +66,7 @@ class InputFlight {
 class InputTracker {
     // Watch pointer events across the app
     // adapted from https://www.redblobgames.com/making-of/draggable/
-    constructor(el) {
+    constructor({el}) {
         el = el || window
         console.log("touch", el)
         el.addEventListener('touchdown', (event) => this.start(event));

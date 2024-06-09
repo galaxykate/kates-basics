@@ -213,6 +213,8 @@ const Tracker = (function () {
 			this.tracker = tracker
 
 			this.idNumber = trackableCount++;
+			this.uid = uuidv4()
+			
 			this.id = this.type + this.idNumber
 			this.idColor = [(this.idNumber * 73) % 360, 100, 50];
 			this.isActive = false;
@@ -699,13 +701,12 @@ const Tracker = (function () {
 			});
 		}
 
+		get trackables() {
+			return [].concat(this.faces, this.hands, this.poses)
+		}
 
 		get activeTrackables() {
-			return {
-				faces:this.faces.filter((f) => f.isActive),
-				hands:this.hands.filter((f) => f.isActive),
-				poses:this.poses.filter((f) => f.isActive)
-			}
+			return this.trackables.filter(tr => tr.isActive)
 		}
 
 
