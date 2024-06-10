@@ -30,7 +30,7 @@ function forEachInObj({obj, fxn, path=[], parent, key}) {
     }
 }
 
-function getFromPath(obj, path) {
+function getAtPath(obj, path) {
     path.forEach(key => {
         let uidObj = obj.getObjectByUID?.(key)
         obj = uidObj === undefined?obj[key]:uidObj
@@ -42,7 +42,7 @@ function getFromPath(obj, path) {
 function setAtPath(obj, path, val) {
     let lastKey = path[path.length - 1]
     let subPath = path.slice(0, path.length - 1)
-    let lastObj = getFromPath(obj, subPath)
+    let lastObj = getAtPath(obj, subPath)
     lastObj[lastKey] = val
 }
 

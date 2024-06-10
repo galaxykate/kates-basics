@@ -1,4 +1,62 @@
+Vue.component("line-graph", {
+	template: `<div>
+		<div ref="p5">
+		</div>
+	</div>`,
 
+
+
+	mounted() {
+		createP5({
+	        w: 200,
+	        h: 30,
+	        el: this.$refs.p5
+      	}).then(p => {
+      		this.p = p
+
+
+      		p.draw = () => {
+      			p.background(100, 50, 90)
+      			// console.log(this.data)
+
+      			// Draw this line
+      			let data = this.data.slice(-this.dataWindow)
+      			
+      			p.noFill()
+      			p.stroke(0)
+      			p.beginShape()
+      			for (var i = 0; i < data.length; i++) {
+      				let pctX = i/(data.length - 1)
+      				let x = pctX*p.width
+
+      				let val = data[i]
+      				let pctY = (val - this.min)/(this.max - this.min)
+      				let y = (1- pctY)*p.height
+      				// console.log(val, pctY, y)
+      				p.vertex(x, y)
+      			}
+      			p.endShape()
+      		}
+      	})
+	},
+
+	props: {
+		data: {
+
+		},
+
+		dataWindow: {
+			default: 100,
+		},
+
+		min: {
+			default:-1,
+		}, 
+		max: {
+			default:1,
+		}, 
+	}
+})
 
 Vue.component("number-tracker", {
 	template: `<div :style="style" class="inline-block">

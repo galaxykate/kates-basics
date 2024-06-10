@@ -25,9 +25,7 @@ let app = {
   }),
     
   // Recording stuff
-  recorder: new Recorder({
-
-  }),
+  recorder: new Recorder(),
 
   objectsByUID: {},
 
@@ -40,6 +38,13 @@ let app = {
 
   getObjectByUID(uid) {
     return this.objectsByUID[uid]
+  },
+
+  get frame() {
+    return this.recordingChannels.map(channel => {
+      let val = getAtPath(this, channel.path)
+      return {channel,val}
+    })
   },
 
   // face/hand tracking stuff
@@ -64,6 +69,22 @@ let app = {
     c: [0, 0, 0]
   },
 
+  get recordingChannels() {
+    let channels = []
+    forEachInObj({
+        obj:this.objectsByUID, 
+        fxn:({obj, fxn, path, parent, key}) => {
+          // Add this channel, as a ...path?
+          channels.push({
+            path:["objectsByUID"].concat(path)
+          })
+        }
+    })
+    return channels
+  },
+
+
+
   init() {
 
       // Add all the trackables to the recorder
@@ -72,9 +93,8 @@ let app = {
       // })
     // this.recorder.addChannels(this.noiseValues)
     let path =  ["noiseValues", "c", 1]
-    let val = getFromPath(this, path)
-    console.log(path, val)
-
+    let val = getAtPath(this, path)
+    
     this.registerUID({
       x:Math.random(),
       y:Math.random(),
@@ -101,7 +121,7 @@ let app = {
       pts: val2,
     }, "arr")
 
-
+    app.recorder.startRecording({channels: app.recordingChannels})
 
   },
 
@@ -110,11 +130,7 @@ let app = {
   update() {
     let t = Date.now()*.001
 
-    this.noiseValues.a = noise(t + 100)
-    this.noiseValues.b = noise(t*2 + 100)
-    for (var i = 0; i < 3; i++) {
-      this.noiseValues.c[i] = noise(t*.5 + 100*i)
-    }
+
 
     let path =  ["noiseValues", "c", 1]
     setAtPath(this, path, 1)
@@ -125,11 +141,13 @@ let app = {
       fxn: ({val, path, parent, key}) => {
         index++
         if (key !== "index") {
-          parent[key] = noise(index, t*.1)
+          parent[key] = .4*noise(index, t*2) + .5*noise(t*4)
         }
       }
     })
 
+    // app.recorder.update({t})
+    app.recorder.activeRecording.addFrame(app.frame)
 
   }
 }
@@ -143,8 +161,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
     template: `<div id="app">
       <div class="columns"> 
         <div class="column">
+     
           <recorder-widget :recorder="app.recorder" />
-          {{app.objectsByUID}}
           <div class="grid" v-show="false">
 
             <div ref="p5"  /> 
