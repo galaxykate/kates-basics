@@ -1,10 +1,29 @@
+/**
+ * Given data, or xycoords
+ **/
+
 Vue.component("line-graph", {
 	template: `<div>
 		<div ref="p5">
 		</div>
 	</div>`,
 
+	methods: {
+		getPos(v, index, data) {
 
+			// First get the pct, then convert it into xy
+			let pctX = 0
+			let pctY = 0;
+
+			if (!isNaN(v)) {
+				// if just a number the x is implicit
+				pctX = index/(data.length - 1)
+				pctY = (v - this.yRange[0])/(this.yRange[1] - this.yRange[0])
+			}
+			
+			return [pctX*this.p.width, (1-pctY)*this.p.height]
+		}
+	},
 
 	mounted() {
 		createP5({
@@ -16,26 +35,27 @@ Vue.component("line-graph", {
 
 
       		p.draw = () => {
+
       			p.background(100, 50, 90)
       			// console.log(this.data)
 
       			// Draw this line
       			let data = this.data.slice(-this.dataWindow)
-      			
       			p.noFill()
       			p.stroke(0)
       			p.beginShape()
       			for (var i = 0; i < data.length; i++) {
-      				let pctX = i/(data.length - 1)
-      				let x = pctX*p.width
-
-      				let val = data[i]
-      				let pctY = (val - this.min)/(this.max - this.min)
-      				let y = (1- pctY)*p.height
-      				// console.log(val, pctY, y)
+      				let v = data[i]
+      				let [x,y] = this.getPos(data[i], i, data)
+      				
       				p.vertex(x, y)
       			}
       			p.endShape()
+
+      			this.markers.forEach(marker => {
+      				let [x,y] = this.getPos(0, marker.x, data)
+      				p.rect(x, y, 2, 20)
+      			})
       		}
       	})
 	},
@@ -49,12 +69,17 @@ Vue.component("line-graph", {
 			default: 100,
 		},
 
-		min: {
-			default:-1,
-		}, 
-		max: {
-			default:1,
-		}, 
+		yRange: {
+			default: [-1,1]
+		},
+
+		xRange: {
+			default: undefined
+		},
+
+		markers: {
+		default:[],
+		},
 	}
 })
 

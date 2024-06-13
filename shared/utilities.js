@@ -26,7 +26,7 @@ function forEachInObj({obj, fxn, path=[], parent, key}) {
             key: key
         }))
     else {
-        console.log(path,typeof obj)
+        // console.log(path,typeof obj)
     }
 }
 

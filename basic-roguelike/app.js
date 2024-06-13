@@ -47,6 +47,15 @@ let app = {
     })
   },
 
+  set frame(frame) {
+    // console.log("SET FRAME", frame)
+
+    return frame.map(({path, val}) => {
+      // console.log(path, val)
+      setAtPath(this, path, val)
+    })
+  },
+
   // face/hand tracking stuff
   tracker:new Tracker({
     maxHistory: 10,
@@ -91,6 +100,10 @@ let app = {
       // this.tracker.trackables.forEach(trackable => {
       //   this.recorder.addTrackableLandmarks({trackable})
       // })
+
+    this.recorder.onPlaybackFrame((frame) => {
+      this.frame = frame
+    })
     // this.recorder.addChannels(this.noiseValues)
     let path =  ["noiseValues", "c", 1]
     let val = getAtPath(this, path)
@@ -130,25 +143,27 @@ let app = {
   update() {
     let t = Date.now()*.001
 
+    if (app.recorder.isPlaying) {
 
-
-    let path =  ["noiseValues", "c", 1]
-    setAtPath(this, path, 1)
-
-    let index = 0
-    forEachInObj({  
-      obj:this.objectsByUID, 
-      fxn: ({val, path, parent, key}) => {
-        index++
-        if (key !== "index") {
-          parent[key] = .4*noise(index, t*2) + .5*noise(t*4)
+    } 
+    else {
+       let index = 0
+      forEachInObj({  
+        obj:this.objectsByUID, 
+        fxn: ({val, path, parent, key}) => {
+          index++
+          if (key !== "index") {
+            parent[key] = .4*noise(index, t*2) + .5*noise(t*4)
+          }
         }
-      }
-    })
+      })
 
-    // app.recorder.update({t})
-    app.recorder.activeRecording.addFrame(app.frame)
+      
 
+    }
+
+    app.recorder.update({t, frame: app.frame})
+   
   }
 }
 
