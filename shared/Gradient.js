@@ -220,15 +220,18 @@ Vue.component("gradient-widget", {
         		if (gradient) {
 	        		// Find the box for this gradient
 	        		let box = this.boxes.find(box => gradient === box.gradient)
-	        		let pctY = f.value
-	        		let pos = box.getPositionByPct({pctX:f.modePct, pctY})
-	        		// console.log(f.modePct, pos)
-	        		p.circle(...pos, 20)
+	        		let {h, s, l, y} = f.value
+	        		// console.log(h, s, l, y)
+
+	        		// let pos = box.getPositionByPct({pctX:f.modePct, pctY})
+	        		// // console.log(f.modePct, pos)
+	        		// p.circle(...pos, 20)
 
 	        		let x = p.width*.9 + 10*index
-	        		let y = pctY*p.height
+	        		let py = y*p.height
 
-	        		p.circle(x, y, 30)
+	        		p.fill(h*360, s*100, l*100)
+	        		p.circle(x, py, 30)
 	        	}
 
 
