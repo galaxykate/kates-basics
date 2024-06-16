@@ -6,6 +6,8 @@
 // GLOBAL VALUES, CHANGE IF YOU WANT
 
 let app = {
+
+
   useCapture: false,
   grid: new Grid({width:15,height:10,depth:3}),
 
@@ -16,13 +18,15 @@ let app = {
     offset: {x:10, y:10}
   },
 
-  input: new InputTracker({
-    drag: {
-      start() {
+  gradients: [],
+  followers: [],
+  // input: new InputTracker({
+  //   drag: {
+  //     start() {
         
-      }
-    }
-  }),
+  //     }
+  //   }
+  // }),
     
   // Recording stuff
   recorder: new Recorder(),
@@ -95,6 +99,40 @@ let app = {
 
 
   init() {
+    let v0 = new WaterClock({})
+
+    // Example usage
+    let clock = new WaterClock();
+
+    console.log(v0)
+
+    let attack = new MultiGradient(["h", "s", "l", "y"])
+    let sustain = new MultiGradient(["h", "s", "l", "y"])
+    let release = new MultiGradient(["h", "s", "l", "y"])
+    app.gradients = [attack, sustain, release]
+    let t = Date.now()*.001
+    for (var i = 0; i < 3; i++) {
+      let f = new EnvelopeFollower({
+
+        attack: {
+          gradient:attack,
+          length: Math.random()*.5 + .5
+        },
+        sustain: {
+          gradient:sustain,
+          loop: 5,
+          length: Math.random()*.5 + .5
+        },
+        release: {
+          gradient:release,
+          length: Math.random()*.5 + .5
+        }
+
+      }, true)
+      app.followers.push(f)
+      f.start(t)
+    }
+    
 
       // Add all the trackables to the recorder
       // this.tracker.trackables.forEach(trackable => {
@@ -163,6 +201,7 @@ let app = {
     }
 
     app.recorder.update({t, frame: app.frame})
+    app.followers.forEach(f => f.update(t))
    
   }
 }
@@ -176,8 +215,9 @@ document.addEventListener("DOMContentLoaded", (event) => {
     template: `<div id="app">
       <div class="columns"> 
         <div class="column">
+          <gradient-widget :gradients="app.gradients" :followers="app.followers" /> 
      
-          <recorder-widget :recorder="app.recorder" />
+          <recorder-widget :recorder="app.recorder"  v-show="false" />
           <div class="grid" v-show="false">
 
             <div ref="p5"  /> 
@@ -190,8 +230,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
         </div>
 
         <div class="column">
-          <number-trackers :obj="app.noiseValues" />
-          <number-trackers :obj="app.objectsByUID" />
+      
           <div class="controls">
             <input v-model.number="app.gridSize.cellSize" type="range" min="10" max="30" />{{app.gridSize.cellSize}}</label>
             <input v-model.number="app.gridSize.displayLayer" type="range" min="0" max="3" />{{app.gridSize.displayLayer}}</label>

@@ -15,7 +15,9 @@ Vue.component("recorder-widget", {
 		{{recorder.playbackPct}}
 		<div>
 			Mode: {{recorder.mode}}
+			<div v-if="recording">
 			{{recorder.playbackFrameNumber}}/{{recording.frameCount}}
+			</div>
 		</div>
 		<div v-if="recording">	
 

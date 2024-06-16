@@ -1,5 +1,98 @@
 // Utilities
 
+
+
+class Box {
+    constructor({x, y, w, h, x1, y1}) {
+        if (isNaN(x) || isNaN(y)) {
+            throw new Error("Invalid box definition");
+        }
+        if (!isNaN(w) && !isNaN(h)) {
+            // Define the box with width and height
+            this.x0 = x;
+            this.y0 = y;
+            this.x1 = x + w;
+            this.y1 = y + h;
+        } else if (!isNaN(x1) && !isNaN(y1)) {
+            // Define the box with two points
+            this.x0 = x;
+            this.y0 = y;
+            this.x1 = x1;
+            this.y1 = y1;
+        } else {
+            throw new Error("Invalid box definition");
+        }
+    }
+
+    get xMin() {
+        return Math.min(this.x0, this.x1);
+    }
+
+    get xMax() {
+        return Math.max(this.x0, this.x1);
+    }
+
+    get yMin() {
+        return Math.min(this.y0, this.y1);
+    }
+
+    get yMax() {
+        return Math.max(this.y0, this.y1);
+    }
+
+    get xRange() {
+        return this.xMax -  this.xMin
+    }
+
+    get yRange() {
+        return this.yMax -  this.yMin
+    }
+
+    getPct(pt) {
+        const [x, y] = Array.isArray(pt) ? pt : (pt?.x !== undefined && pt?.y !== undefined ? [pt.x, pt.y] : (() => { throw new Error("Unknown pt type " + typeof(pt)); })());
+        return [(x - this.xMin)/(this.xRange), (y - this.yMin)/(this.yRange)]
+    }
+
+    getPositionByPct({pctX, pctY}) {
+        let x = pctX*this.xRange + this.xMin
+        let y = pctY*this.yRange + this.yMin
+        return [x,y]
+    }
+
+
+    contains(pt) {
+        const [x, y] = Array.isArray(pt) ? pt : (pt?.x !== undefined && pt?.y !== undefined ? [pt.x, pt.y] : (() => { throw new Error("Unknown pt type " + typeof(pt)); })());
+        // Use getters to ensure correct bounds
+
+        let contains = x >= this.xMin && x <= this.xMax && y >= this.yMin && y <= this.yMax;
+        return contains
+    }
+
+    constrain(pt) {
+        if (Array.isArray(pt)) {
+            pt[0] = Math.min(Math.max(pt[0], this.xMin), this.xMax);
+            pt[1] = Math.min(Math.max(pt[1], this.yMin), this.yMax);
+        } else if (pt?.x !== undefined && pt?.y !== undefined) {
+            pt.x = Math.min(Math.max(pt.x, this.xMin), this.xMax);
+            pt.y = Math.min(Math.max(pt.y, this.yMin), this.yMax);
+        } else {
+            throw new Error("Invalid point type " + typeof(pt));
+        }
+    }
+
+    remap({pt, originalBox = [0, 0, 1, 1]}) {
+        const extractBounds = (box) => Array.isArray(box) ? box : [box.x0, box.y0, box.x1, box.y1];
+        const [oX0, oY0, oX1, oY1] = extractBounds(originalBox);
+        const [tX0, tY0, tX1, tY1] = extractBounds(this);
+        const [x, y] = Array.isArray(pt) ? pt : (pt?.x !== undefined && pt?.y !== undefined ? [pt.x, pt.y] : (() => { throw new Error("Unknown pt type " + typeof(pt)); })());
+        
+        let newX = ((x - oX0) / (oX1 - oX0)) * (tX1 - tX0) + tX0;
+        let newY = ((y - oY0) / (oY1 - oY0)) * (tY1 - tY0) + tY0;
+        return [newX, newY];
+    }
+}
+
+
 function forEachInObj({obj, fxn, path=[], parent, key}) {
     if (!isNaN(obj)) {
         fxn({
@@ -123,17 +216,89 @@ class InputTracker {
     }
 }
 
-function createP5({w=200,h=200, el, colorMode="HSL"}) {
+function createP5({w=200,h=200, el, colorMode="HSL", draw, keyReleased,keyPressed,mouseClicked, doubleClicked, mouseMoved, mousePressed, mouseReleased, getClosest, startDrag, stopDrag, drag}) {
     return new Promise((resolve,reject) => {
+
         new p5(p => {
+            Object.defineProperty(p, 'mouseIsInCanvas', {
+                get() {
+                    return p.mouseX >= 0 && p.mouseY >= 0 && p.mouseX <= p.width && p.mouseY <= p.height
+                },
+            });
+
+            p.dragging = undefined
+
+            p.draw = () => draw(p)
+            
+
             p.setup = () => {
               p.createCanvas(w, h);
               p.colorMode(p[colorMode])
-
-             
               resolve(p)    
 
             };
+
+             p.keyReleased = (key) => {
+                if (p.mouseIsInCanvas) {
+                    keyReleased?.(key)
+                }
+            }
+            p.keyPressed = (key) => {
+                if (p.mouseIsInCanvas) {
+                    keyPressed?.(key)
+                }
+            }
+
+             p.mouseMoved = () => {
+                if (p.mouseIsInCanvas) {
+                    mouseMoved?.(p.mouseX, p.mouseY)
+                }
+            }
+
+            p.mouseClicked = () => {
+                if (p.mouseIsInCanvas) {
+                    mouseClicked?.(p.mouseX, p.mouseY)
+                }
+            }
+
+             p.doubleClicked = () => {
+                if (p.mouseIsInCanvas) {
+                    doubleClicked?.(p.mouseX, p.mouseY)
+                }
+            }
+
+            p.mousePressed = () => {
+                if (p.mouseIsInCanvas) {
+                    // console.log("mouse pressed")
+                    let held = getClosest?.({x:p.mouseX, y:p.mouseY, range:100})
+                    // console.log(held)
+                    p.dragging = {
+                        held,
+                        lastOffset: {x:0,y:0},
+                        startDrag: {x:p.mouseX,y:p.mouseY},
+                        totalDist: 0,
+                        lastDist: 0
+                    }
+                    startDrag?.(p.dragging)
+                }
+            }
+
+            p.mouseDragged = () => { 
+                p.lastOffset = {
+                    x: p.mouseX - p.pmouseX,
+                    y: p.mouseY - p.pmouseY
+                }
+                let d = Math.sqrt((p.lastOffset.x)**2 + (p.lastOffset.y)**2)
+                p.lastDist = d
+                p.totalDist += d
+                drag?.(p.dragging)
+            }
+
+            p.mouseReleased = () => {
+                stopDrag?.(p.dragging)
+                p.dragging = undefined
+            }
+
         }, el)
     })
 }
@@ -256,6 +421,7 @@ function remap(v, v0, v1, nv0, nv1) {
     let pct = (v - v0)/(v1 - v0)
     return pct*(nv1 - nv0) + nv0
 }
+
 
 let noise = (() => {
     let noiseFxn = new SimplexNoise(0)
