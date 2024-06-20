@@ -2,6 +2,11 @@
  * A suite of tools for doing recording and playback
  **/
 
+// Frames are recorded as 
+// {objects,data}
+// Where objects is [{type,id,landmarkCount,dimensions}], 
+// and data is the flat datastructure
+
 
 
 Vue.component("recorder-widget", {

@@ -258,7 +258,9 @@ Vue.component("gradient-widget", {
 
 	props: {
 		"gradients": {},
-		"followers": {},
+		"followers": {
+		default:[]
+		},
 	}
 })
 
@@ -379,7 +381,7 @@ class MultiGradient {
 }
 
 class Gradient {
-	constructor({channel}) {
+	constructor({channel, points}) {
 		this.channel = channel
 		this.points = []
 

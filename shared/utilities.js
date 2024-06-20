@@ -1,5 +1,3 @@
-// Utilities
-
 
 
 class Box {
@@ -303,7 +301,7 @@ function createP5({w=200,h=200, el, colorMode="HSL", draw, keyReleased,keyPresse
     })
 }
 
-function createP5Capture({p,w,h}) {
+function createP5Capture({p}) {
     /**
      * Creating the P5 capture can be a bit async
      * so wrap it in a promise
@@ -311,9 +309,10 @@ function createP5Capture({p,w,h}) {
 
     // start creating the capture
     let capture = p.createCapture(p.VIDEO)
-    capture.size(w,h)
+    console.log(capture)
+
     capture.hide()
-    console.log("Create capture!", w, h)
+    console.log("Create capture!", capture.width, capture.height)
 
     return new Promise((resolve, reject) => {
         let count = 0

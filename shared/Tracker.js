@@ -207,10 +207,11 @@ const Tracker = (function () {
 
 
 	class Trackable {
-		constructor(tracker, landmarkCount) {
+		constructor(tracker, landmarkCount, dimensionality) {
 
 
 			this.tracker = tracker
+			this.landmarkCount = landmarkCount
 
 			this.idNumber = trackableCount++;
 			this.uid = uuidv4()
@@ -246,24 +247,54 @@ const Tracker = (function () {
 			return this.landmarks[0].toArray().length
 		}
 
-		get flatData() {
 
-			let data = this.landmarks.map(lmk => lmk.toArray()).flat()
-			return data
+		get data() {
+			return this.landmarks.map(lmk => lmk.toArray())
+		}
+
+		set data(data) {
+			if (data.length === this.landmarks.length)
+				this.landmarks.forEach((lmk,index) => {
+					lmk.setTo(data[index])
+				})
+			else {
+				throw(`Mismatched array size for ${this}: expected length ${this.landmarks.length}, got ${data.length}`)
+			}
+		}
+
+		get flatDataSize() {
+			return this.landmarkCount*this.dimensionality
+		}
+
+		get flatData() {
+			return this.arrayData.flat()
 		}
 
 		set flatData(data) {
-			let dim = this.dimensionality
-			let count = data.length/dim
+			let dim = data.length/this.landmarks.length
+			if (dim%1 !== 0)
+				throw(`Mismatched array size for ${this}: expected multiple of ${this.landmarks.length}, got ${data.length}`)
+			
+
 			this.landmarks.forEach((lmk,index) => {
 				let arr = data.slice(index*dim, (index+1)*dim)
-		  // arr[0] += 20
 				lmk.setTo(arr)
-		  // if (this.isActive)
-		  //   console.log(arr)
 			})
-
 		}
+
+		getFlatDataByIndices({indices, dimensionality}) {
+			return indices.map(index => {
+				this.landmarks[index].toArray().slice(0, dimensionality)
+			}).flat()
+		}
+
+		setFromFlatDataByIndices({data, indices, dimensionality}) {
+			return indices.map((lmkIndex, index) => {
+				let arr = data.slice(index*dimensionality, (index+1)*dimensionality)
+				this.landmarks[lmkIndex].setTo(arr)
+			})
+		}
+
 
 		get w() {
 			return this.boundingBox[1].x - this.boundingBox[0].x
@@ -335,11 +366,11 @@ const Tracker = (function () {
 		drawDebugData(p) {
 
 			p.fill(...this.idColor);
-			p.stroke(0);
+			p.noStroke()
 	// console.log(this.landmarks)
 			this.landmarks.forEach((pt) => {
 	  // Landmarks are relative to the image size
-				p.circle(pt.x, pt.y, 6);
+				p.circle(pt.x, pt.y, 3);
 			});
 		}
 
@@ -604,9 +635,9 @@ const Tracker = (function () {
 	class Tracker {
 		constructor({
 			maxHistory=  10,
-			maxNumHands= 6,
-			maxNumPoses= 3,
-			maxNumFaces= 3,
+			numHands= 6,
+			numPoses= 3,
+			numFaces= 3,
 			doAcquireFaceMetrics=false,
 			doAcquirePoseMetrics=false,
 			doAcquireHandMetrics=false,
@@ -636,22 +667,21 @@ const Tracker = (function () {
 			this.isActive = false;
 			this.config = {
 				doAcquireFaceMetrics: true,
-		cpuOrGpuString:gpu?"GPU":CPU /* "GPU" or "CPU" */,
-				maxNumHands,
-				maxNumPoses,
-				maxNumFaces,
+				cpuOrGpuString:gpu?"GPU":CPU /* "GPU" or "CPU" */,
+				numHands,
+				numFaces,
+				numPoses,
 				doAcquireFaceMetrics,
 				doAcquireHandMetrics,
 				doAcquirePoseMetrics,
 
 			};
+			console.log(this.config)
 
-	// Support up to 3 faces and 6 hands.
-	// We don't know whose is whose though
-
-			this.faces = Array.from({length:maxNumFaces}, ()=> new Face(this))
-			this.hands = Array.from({length:maxNumHands}, ()=> new Hand(this))
-			this.poses = Array.from({length:maxNumHands}, ()=> new Pose(this))
+			console.log(`${numHands} hands, ${numFaces} faces, ${numPoses} poses, `)
+			this.faces = Array.from({length:numFaces}, ()=> new Face(this))
+			this.hands = Array.from({length:numHands}, ()=> new Hand(this))
+			this.poses = Array.from({length:numPoses}, ()=> new Pose(this))
 
 			this.landmarkers = {}
 
@@ -671,7 +701,9 @@ const Tracker = (function () {
 		}
 
 		drawSource({p, flip=false, x = 0, y = 0, scale = 1.0}) {
+
 			if (this.source) {
+				console.log(this.source.width, this.source.height)
 				p.push()
 				p.translate(x, y)
 				p.scale(scale)
@@ -728,14 +760,15 @@ const Tracker = (function () {
 				let modelAssetPath = modelPaths[type]
 				let typeCap = type.charAt(0).toUpperCase() + type.slice(1)
 				let LandmarkerClass = this.mediapipe_module[typeCap + "Landmarker"]
-
+				
+				console.log("config", this.config, this.config.cpuOrGpuString)
 				LandmarkerClass.createFromOptions(
 					this.vision,
 					{
-						["num" + typeCap]: 3,
+						...this.config,
 						runningMode: "VIDEO",
 						baseOptions: {
-							delegate: this.cpuOrGpuString,
+							delegate: this.config.cpuOrGpuString,
 							modelAssetPath
 						},
 					}).then(landmarker => {
@@ -782,7 +815,7 @@ const Tracker = (function () {
 			if (data) {
 				this.hands.forEach((hand, handIndex) => {
 					let landmarks = data.landmarks[handIndex];
-
+					
 					if (landmarks) {
 						hand.isActive = true;
 						hand.handedness = data.handednesses[handIndex];
@@ -799,7 +832,7 @@ const Tracker = (function () {
 		async predictFace() {
 
 			let startTimeMs = performance.now();
-	// console.log(this.landmarkers)
+
 			let data = this.landmarkers.face?.detectForVideo(this.source.elt, startTimeMs);
 
 			if (data) {

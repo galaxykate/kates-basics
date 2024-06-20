@@ -8,171 +8,159 @@
 let app = {
 
 
-  useCapture: false,
-  grid: new Grid({width:15,height:10,depth:3}),
+  useCapture: true,
 
-  gridSize: {
-    displayLayer: 0,
-    cellSize: 20,
-    cellPadding: 5,
-    offset: {x:10, y:10}
-  },
 
-  gradients: [],
-  followers: [],
-  // input: new InputTracker({
-  //   drag: {
-  //     start() {
-        
-  //     }
-  //   }
-  // }),
-    
+  // grid: new Grid({width:15,height:10,depth:3}),
+  // gridSize: {
+  //   displayLayer: 0,
+  //   cellSize: 20,
+  //   cellPadding: 5,
+  //   offset: {x:10, y:10}
+  // },
+
   // Recording stuff
+  // We probably need to play back the recording with the same settings
   recorder: new Recorder(),
+  recording: undefined,
+  player: new RecordingPlayer(),
 
-  objectsByUID: {},
 
-  registerUID(obj, uid) {
-    if (!uid)
-      uid = uuidv4()
-    Vue.set(this.objectsByUID, uid, obj)
-    // this.objectsByUID[uid] = obj
+
+  // We can only record fixed objects anyways, no 
+  dataKeys: [],
+  objectDirectory: {
+   
   },
 
-  getObjectByUID(uid) {
-    return this.objectsByUID[uid]
+  // Get and load data as a frame (allows us to save strings?)
+  get dataFrame() {
+
+      // Get data for this frame
+      return app.dataKeys.map((id) => {
+        let obj = this.objectDirectory[id]
+
+        if (!obj)
+          console.warn(`No object for id ${id}`, this.objectDirectory)
+        else {
+          let dataCopy = JSON.parse(JSON.stringify(obj.data))
+          return {
+            id,
+            data: dataCopy // Double check for non-JSON data
+          }
+        }
+      })
   },
 
-  get frame() {
-    return this.recordingChannels.map(channel => {
-      let val = getAtPath(this, channel.path)
-      return {channel,val}
+  set dataFrame(frame) {
+    frame.forEach(({id,data}) => {
+      this.objectDirectory[id].set(data)
     })
   },
 
-  set frame(frame) {
-    // console.log("SET FRAME", frame)
-
-    return frame.map(({path, val}) => {
-      // console.log(path, val)
-      setAtPath(this, path, val)
+  set dataFrame(frame) {
+    frame.forEach(({id,data}) => {
+      this.objectDirectory[id].set(data)
     })
   },
+
+  get numericalFrame() {
+    // Returns {data (Array of numbers), indices: [{id,len,start,end}]}
+      // Get flat numerical for this frame
+      let frame = {
+        indices:[]
+      }
+      let startIndex = 0
+
+      let arrs = ids.map((id,index) => {
+        let obj = this.objectDirectory[id]
+        let flatData = obj.flatData
+        
+        frame.indices[index] = {
+          id: id,
+          len: flatData.length,
+          start: startIndex, 
+          end: startIndex + flatData.length
+        }
+        return flatData
+      })
+      frame.data = arrs.flat
+      return frame
+  },
+
+
+
 
   // face/hand tracking stuff
   tracker:new Tracker({
     maxHistory: 10,
-    modulePath:"/widgets/mediapipe/",
+    modulePath:"../vendor/mediapipe/",
     // landmarkerPath: "https://storage.googleapis.com/mediapipe-models/[TYPE]_landmarker/[TYPE]_landmarker/float16/1/"
     modelPaths: {
-      // hand: "/widgets/mediapipe/hand_landmarker.task",
-      // face: "/widgets/mediapipe/face_landmarker.task",
+      hand: "../vendor/mediapipe/hand_landmarker.task",
+      face: "../vendor/mediapipe/face_landmarker.task",
       // pose: "/widgets/mediapipe/pose_landmarker_full.task",
     },
-    
+
+    numHands: 6,
+    numPoses: 3,
+    numFaces: 3,
+  
     createLandmark() {
       return new KVector(0,0,0)
     }
   }),
 
-  noiseValues: {
-    a: 0,
-    b: 0,
-    c: [0, 0, 0]
-  },
-
-  get recordingChannels() {
-    let channels = []
-    forEachInObj({
-        obj:this.objectsByUID, 
-        fxn:({obj, fxn, path, parent, key}) => {
-          // Add this channel, as a ...path?
-          channels.push({
-            path:["objectsByUID"].concat(path)
-          })
-        }
-    })
-    return channels
-  },
-
-
 
   init() {
-    let v0 = new WaterClock({})
 
-    // Example usage
-    let clock = new WaterClock();
 
-    console.log(v0)
+    app.objectDirectory.hand0 = this.tracker.hands[0]
+    app.objectDirectory.hand1 = this.tracker.hands[1]
+    app.dataKeys = ["hand0", "hand1"]
 
-    let attack = new MultiGradient(["h", "s", "l", "y"])
-    let sustain = new MultiGradient(["h", "s", "l", "y"])
-    let release = new MultiGradient(["h", "s", "l", "y"])
-    app.gradients = [attack, sustain, release]
-    let t = Date.now()*.001
-    for (var i = 0; i < 3; i++) {
-      let f = new EnvelopeFollower({
+    console.log(app.dataFrame)
 
-        attack: {
-          gradient:attack,
-          length: Math.random()*.5 + .5
-        },
-        sustain: {
-          gradient:sustain,
-          loop: 5,
-          length: Math.random()*.5 + .5
-        },
-        release: {
-          gradient:release,
-          length: Math.random()*.5 + .5
-        }
-
-      }, true)
-      app.followers.push(f)
-      f.start(t)
-    }
+    app.recorder = new Recorder({
+      getDataFrame: () => {
     
-
-      // Add all the trackables to the recorder
-      // this.tracker.trackables.forEach(trackable => {
-      //   this.recorder.addTrackableLandmarks({trackable})
-      // })
-
-    this.recorder.onPlaybackFrame((frame) => {
-      this.frame = frame
+      },
     })
-    // this.recorder.addChannels(this.noiseValues)
-    let path =  ["noiseValues", "c", 1]
-    let val = getAtPath(this, path)
+
     
-    this.registerUID({
-      x:Math.random(),
-      y:Math.random(),
-      z:Math.random(),
-    }, "test")
+    // let v0 = new WaterClock({})
 
-    this.registerUID({
-      x:Math.random(),
-      y:Math.random(),
-      z:Math.random(),
-    }, "test2")
+    // // Example usage
+    // let clock = new WaterClock();
 
-    let val2 = []
-    for (var i = 0; i < 5; i++) {
-      val2.push({
-        index: i,
-        x:Math.random(),
-        y:Math.random(),
-        z:Math.random(),
-      })
-    }
+    // console.log(v0)
 
-    this.registerUID({
-      pts: val2,
-    }, "arr")
+    // let attack = new MultiGradient(["h", "s", "l", "y"])
+    // let sustain = new MultiGradient(["h", "s", "l", "y"])
+    // let release = new MultiGradient(["h", "s", "l", "y"])
+    // app.gradients = [attack, sustain, release]
+    // let t = Date.now()*.001
+    // for (var i = 0; i < 3; i++) {
+    //   let f = new EnvelopeFollower({
 
-    app.recorder.startRecording({channels: app.recordingChannels})
+    //     attack: {
+    //       gradient:attack,
+    //       length: Math.random()*.5 + .5
+    //     },
+    //     sustain: {
+    //       gradient:sustain,
+    //       loop: 5,
+    //       length: Math.random()*.5 + .5
+    //     },
+    //     release: {
+    //       gradient:release,
+    //       length: Math.random()*.5 + .5
+    //     }
+
+    //   }, true)
+    //   app.followers.push(f)
+    //   f.start(t)
+    // }
 
   },
 
@@ -201,7 +189,7 @@ let app = {
     }
 
     app.recorder.update({t, frame: app.frame})
-    app.followers.forEach(f => f.update(t))
+    // app.followers.forEach(f => f.update(t))
    
   }
 }
@@ -215,16 +203,13 @@ document.addEventListener("DOMContentLoaded", (event) => {
     template: `<div id="app">
       <div class="columns"> 
         <div class="column">
-          <gradient-widget :gradients="app.gradients" :followers="app.followers" /> 
-     
+
           <recorder-widget :recorder="app.recorder"  v-show="false" />
-          <div class="grid" v-show="false">
+          <div class="grid" v-if="false">
 
             <div ref="p5"  /> 
-            <grid-view v-if="true"  class="overlay" :gridSize="app.gridSize" :grid="app.grid"  />
-
+            <grid-view class="overlay" :gridSize="app.gridSize" :grid="app.grid"  />
             <pre class="overlay">{{app.grid.toTextLines()}}</pre>
-
             <img :src="app.grid.toImage()" :width="app.grid.width" :height="app.grid.height" />
           </div>
         </div>
@@ -232,8 +217,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
         <div class="column">
       
           <div class="controls">
-            <input v-model.number="app.gridSize.cellSize" type="range" min="10" max="30" />{{app.gridSize.cellSize}}</label>
-            <input v-model.number="app.gridSize.displayLayer" type="range" min="0" max="3" />{{app.gridSize.displayLayer}}</label>
+           
           </div>
         </div>
       </div>
@@ -254,7 +238,37 @@ document.addEventListener("DOMContentLoaded", (event) => {
       createP5({
         w: 500,
         h: 400,
-        el: this.$refs.p5
+        el: this.$refs.p5,
+        draw(p) {
+           p.background(320, 100, 50)
+          app.update()
+
+          // // Tracker drawing
+
+          // Are we in detection or playback mode?
+          if (app.tracker.isActive) {
+            app.tracker.detect()
+          }
+            
+          app.tracker.drawSource({p,x:0,y:0,flip:true})
+          app.tracker.drawDebugData(p)
+          app.tracker.hands[0].landmarks[8].draw(p, 10)
+          app.tracker.faces.filter(face => face.isActive).forEach(face => {
+            
+              // face.landmarks.forEach(pt => {
+              //   p.fill(100)
+              //   // console.log(pt.history.length)
+              //   pt.history.forEach((pt0,index) => {
+              //     p.circle(pt0.x, pt0.y, 10-index)
+              //   })
+                
+              // })
+            
+          }) 
+
+          // console.log(app.grid)
+          // app.grid.draw({p, ...app.gridSize})
+        }
       })
 
       // Make the capture and start tracking
@@ -267,37 +281,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
             app.tracker.isActive = true
           })
         }
-        
-        app.faceCursor = new KVector()
-
-        p.draw = () => {
-          p.background(320, 100, 50)
-
-          app.update()
-
-          // // Tracker drawing
-          // app.tracker.drawSource({p,x:0,y:0,flip:true})
-          // // Are we in detection or playback mode?
-          // if (app.tracker.isActive) {
-          //   app.tracker.detect()
-          // }
-            
-          // app.tracker.drawDebugData(p)
-          // app.tracker.faces.filter(face => face.isActive).forEach(face => {
-            
-          //     face.landmarks.forEach(pt => {
-          //       p.fill(100)
-          //       // console.log(pt.history.length)
-          //       pt.history.forEach((pt0,index) => {
-          //         p.circle(pt0.x, pt0.y, 10-index)
-          //       })
-                
-          //     })
-            
-          // }) 
-          // console.log(app.grid)
-          app.grid.draw({p, ...app.gridSize})
-        }
+      
       })
      
     },
