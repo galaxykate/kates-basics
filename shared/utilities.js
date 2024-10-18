@@ -1,5 +1,58 @@
 
 
+function flatDataRowsToBinary(flatDataRows) {
+   console.log("To binary", flatDataRows)
+   let flatdata = flatDataRows.flat()
+
+    // Create a TypedArray
+    const typedArray = new Float32Array(flatdata);
+    console.log(typedArray)
+
+    // Convert TypedArray to ArrayBuffer
+    const buffer = typedArray.buffer;
+
+    // Convert ArrayBuffer to Base64
+    let binaryString = '';
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000; // 32kB chunks to avoid max call stack error
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binaryString += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+
+    const base64String = btoa(binaryString);
+
+    return base64String;
+}
+
+function flatDataRowsFromBinary(base64String, length) {
+    // Convert Base64 to ArrayBuffer
+    const binaryString = atob(base64String);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Convert ArrayBuffer to TypedArray
+    const arr = new Float32Array(bytes.buffer);
+    const dim = arr.length/length
+   
+    return Array.from({length}, (_,i) => Array.from(arr.slice(i*dim, (i+1)*dim)))
+}
+
+function formatDate(timestamp) {
+  let date = new Date(timestamp)
+  const dateOptions = { month: 'long', day: 'numeric' };
+  const datePart = date.toLocaleDateString('en-US', dateOptions);
+  
+  const timeOptions = { hour: 'numeric', minute: 'numeric', hour12: true };
+  const timePart = date.toLocaleTimeString('en-US', timeOptions);
+  
+  return `${datePart}, ${timePart}`;
+}
+
+
 class Box {
     constructor({x, y, w, h, x1, y1}) {
         if (isNaN(x) || isNaN(y)) {
@@ -21,6 +74,20 @@ class Box {
             throw new Error("Invalid box definition");
         }
     }
+
+    get w() {
+        return this.x1 - this.x0
+    }
+    get h() {
+        return this.y1 - this.y0
+    }
+    get x() {
+        return this.x0
+    }
+    get y() {
+        return this.y0
+    }
+    
 
     get xMin() {
         return Math.min(this.x0, this.x1);
@@ -51,11 +118,13 @@ class Box {
         return [(x - this.xMin)/(this.xRange), (y - this.yMin)/(this.yRange)]
     }
 
-    getPositionByPct({pctX, pctY}) {
+    getPositionByPct(pctX, pctY) {
         let x = pctX*this.xRange + this.xMin
         let y = pctY*this.yRange + this.yMin
         return [x,y]
     }
+
+   
 
 
     contains(pt) {
@@ -137,165 +206,255 @@ function setAtPath(obj, path, val) {
     lastObj[lastKey] = val
 }
 
+function createTHREE({w=200,h=200, el, update}) {
+    // Create a scene
+    const scene = new THREE.Scene();
 
-class InputFlight {
-    // Path a touch takes and what happens during it
-    // Generalizes to start-stop button presses as well as
-    // mouse-drags, and hand tracking event-to-event movements
-    constructor({startTime,channelID,type}) {
-        this.type = type
-        this.channelID = channelID
-        this.start = startTime === undefined? Date.now():startTime
+    // Create a camera
+    const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
+    camera.position.z = 5;
 
+    // Create a renderer and add it to the document
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(w, h);
+    el.appendChild(renderer.domElement);
+
+    // Add a box geometry and a basic material
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+
+    // Add a basic ambient light
+    const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft white light
+    scene.add(ambientLight);
+
+    // Add a point light
+    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+    pointLight.position.set(10, 10, 10);
+    scene.add(pointLight);
+
+    // Variables for orbital controls
+    let isDragging = false;
+    let previousMousePosition = {
+        x: 0,
+        y: 0
+    };
+
+    const toRadians = angle => angle * (Math.PI / 180);
+    const toDegrees = angle => angle * (180 / Math.PI);
+
+    document.addEventListener('mousedown', (event) => {
+        isDragging = true;
+    });
+
+    document.addEventListener('mousemove', (event) => {
+        if (isDragging) {
+            const deltaMove = {
+                x: event.offsetX - previousMousePosition.x,
+                y: event.offsetY - previousMousePosition.y
+            };
+
+            const deltaRotationQuaternion = new THREE.Quaternion()
+                .setFromEuler(new THREE.Euler(
+                    toRadians(deltaMove.y * 0.1),
+                    toRadians(deltaMove.x * 0.1),
+                    0,
+                    'XYZ'
+                ));
+
+            cube.quaternion.multiplyQuaternions(deltaRotationQuaternion, cube.quaternion);
+        }
+
+        previousMousePosition = {
+            x: event.offsetX,
+            y: event.offsetY
+        };
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+
+        renderer.render(scene, camera);
     }
 
-    toString() {
-        return `${this.type}:${this.channelID} (${this.start}-${this.end})`
-    }
+    animate();
 }
 
-class InputTracker {
-    // Watch pointer events across the app
-    // adapted from https://www.redblobgames.com/making-of/draggable/
-    constructor({el}) {
-        el = el || window
-        console.log("touch", el)
-        el.addEventListener('touchdown', (event) => this.start(event));
-        el.addEventListener('mousedown', (event) => this.start(event));
-        el.addEventListener('pointerdown', (event) => this.start(event));
-        el.addEventListener('pointerup', (event) => this.end(event));
-        el.addEventListener('pointercancel', (event) => this.end(event));
-        el.addEventListener('pointermove', (event) => this.move())
-        el.addEventListener('touchstart', () => e.preventDefault());
-        el.addEventListener('keydown', (e) => this.keydown(event))
-        el.addEventListener('keyup', (e) => this.keyup(event))
 
-        // All things that happen in different channels
-        this.timeline = []
+// FROM GPT
+function hexToHSL(hex) {
+    // Remove the hash at the start if it's there
+    hex = hex.replace(/^#/, '');
+
+    // Parse r, g, b values
+    let r = parseInt(hex.substring(0, 2), 16) / 255;
+    let g = parseInt(hex.substring(2, 4), 16) / 255;
+    let b = parseInt(hex.substring(4, 6), 16) / 255;
+
+    // Find the maximum and minimum values of r, g, b
+    let max = Math.max(r, g, b);
+    let min = Math.min(r, g, b);
+    let h, s, l;
+
+    // Calculate lightness
+    l = (max + min) / 2;
+
+    if (max === min) {
+        h = s = 0; // achromatic
+    } else {
+        let d = max - min;
+
+        // Calculate saturation
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+        // Calculate hue
+        switch (max) {
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0);
+                break;
+            case g:
+                h = (b - r) / d + 2;
+                break;
+            case b:
+                h = (r - g) / d + 4;
+                break;
+        }
+
+        h *= 60;
     }
 
-    keyup(event) {
-        console.log("keyup", event)
-    }
+    // Convert to percentages
+    s = s * 100;
+    l = l * 100;
 
-    keydown(event) {
-        console.log("keydown", event)
-        let flight = new InputFlight({
-            type: "key",
-            channel: event.key
-        })
-    }
-
-    start(event) {
-
-        console.log("start", event.button, event.ctrlKey, event.metaKey, event.shiftKey)
-        console.log(event.type)
-        // if (event.button !== 0) return; // left button only
-        // let {x, y} = state.eventToCoordinates(event);
-        // state.dragging = {dx: state.pos.x - x, dy: state.pos.y - y};
-        // el.classList.add('dragging');
-        // el.setPointerCapture(event.pointerId);
-        let flight = new InputFlight({
-            type:"mouse",
-            channel:event.type
-        })
-    }
-
-    end(event) {
-         console.log("end")
-        // state.dragging = null;
-        // el.classList.remove('dragging');
-    }
-
-    move(event) {
-        // if (!state.dragging) return;
-        // let {x, y} = state.eventToCoordinates(event);
-        // state.pos = {x: x + state.dragging.dx, y: y + state.dragging.dy};
-    }
+    return [Math.round(h), Math.round(s), Math.round(l)];
 }
 
-function createP5({w=200,h=200, el, colorMode="HSL", draw, keyReleased,keyPressed,mouseClicked, doubleClicked, mouseMoved, mousePressed, mouseReleased, getClosest, startDrag, stopDrag, drag}) {
+function createP5({w=200,h=200, el, colorMode="HSL", 
+    draw, setup,
+    keyReleased,keyPressed,
+    mouseClicked, doubleClicked, mouseMoved, mousePressed, mouseReleased, 
+    getClosest, 
+    startDrag, stopDrag, drag}) {
     return new Promise((resolve,reject) => {
 
         new p5(p => {
-            Object.defineProperty(p, 'mouseIsInCanvas', {
-                get() {
-                    return p.mouseX >= 0 && p.mouseY >= 0 && p.mouseX <= p.width && p.mouseY <= p.height
+            p.mouse = {
+                hovered: [],
+                held: [],
+                last: {x:0,y:0},
+                x:0,y:0,
+                startDrag: {x:p.mouseX,y:p.mouseY},
+                dragOffset: {x:0,y:0},
+                totalDist: 0,
+                lastDist: 0,
+
+                isDragging: false,
+
+                get lastOffset() {
+                    return {
+                        x:this.x - this.last.x,
+                        y:this.y - this.last.y,
+                    }
                 },
-            });
+                get isInCanvas() {
+                    return this.x >= 0 && this.y >= 0 && this.x <= p.width && this.y <= p.height
+                }
+            }
 
-            p.dragging = undefined
+            function updateMouse() {
+                p.mouse.last = {
+                    x:p.mouse.x,
+                    y:p.mouse.y,
+                }
+                p.mouse.x = p.mouseX
+                p.mouse.y = p.mouseY
+            }
 
-            p.draw = () => draw(p)
+            p.draw = () => {
+                draw(p)
+                p.mouse.hovered = getClosest({x:p.mouse.x, y:p.mouse.y})
+            }
             
 
             p.setup = () => {
               p.createCanvas(w, h);
               p.colorMode(p[colorMode])
+              setup?.(p)
               resolve(p)    
 
             };
 
              p.keyReleased = (key) => {
-                if (p.mouseIsInCanvas) {
+                if (p.mouse.isInCanvas) {
                     keyReleased?.(key)
                 }
             }
             p.keyPressed = (key) => {
-                if (p.mouseIsInCanvas) {
+                if (p.mouse.isInCanvas) {
                     keyPressed?.(key)
                 }
             }
 
              p.mouseMoved = () => {
-                if (p.mouseIsInCanvas) {
-                    mouseMoved?.(p.mouseX, p.mouseY)
+               updateMouse()
+
+                if (p.mouse.isInCanvas) {
+                    mouseMoved?.(p.mouse, p)
                 }
             }
 
             p.mouseClicked = () => {
-                if (p.mouseIsInCanvas) {
-                    mouseClicked?.(p.mouseX, p.mouseY)
+                if (p.mouse.isInCanvas) {
+                    mouseClicked?.(p.mouse, p)
                 }
             }
 
              p.doubleClicked = () => {
-                if (p.mouseIsInCanvas) {
-                    doubleClicked?.(p.mouseX, p.mouseY)
+                if (p.mouse.isInCanvas) {
+                    doubleClicked?.(p.mouse, p)
                 }
             }
 
             p.mousePressed = () => {
-                if (p.mouseIsInCanvas) {
-                    // console.log("mouse pressed")
-                    let held = getClosest?.({x:p.mouseX, y:p.mouseY, range:100})
-                    // console.log(held)
-                    p.dragging = {
-                        held,
-                        lastOffset: {x:0,y:0},
-                        startDrag: {x:p.mouseX,y:p.mouseY},
-                        totalDist: 0,
-                        lastDist: 0
-                    }
-                    startDrag?.(p.dragging)
+                if (p.mouse.isInCanvas) {
+                   
+                    p.mouse.heldObj = getClosest?.({...p.mouse, range:100})
+                    p.mouse.startDrag = {...p.mouse}
+                    p.mouse.dragDist = 0
+                    p.mouse.isDragging = true
+                   
+                    startDrag?.(p.mouse, p)
                 }
             }
 
             p.mouseDragged = () => { 
-                p.lastOffset = {
-                    x: p.mouseX - p.pmouseX,
-                    y: p.mouseY - p.pmouseY
+                updateMouse()
+                // console.log("Drag", p.mouse.isDragging)
+                if (p.mouse.isDragging) {
+        
+                    let d = Math.sqrt((p.mouse.lastOffset.x)**2 + (p.mouse.lastOffset.y)**2)
+                    p.mouse.lastDist = d
+                    p.mouse.totalDist += d
+                    p.mouse.dragOffset.x = p.mouseX - p.mouse.startDrag.x
+                    p.mouse.dragOffset.y = p.mouseY - p.mouse.startDrag.y
+                    drag?.(p.mouse, p)
                 }
-                let d = Math.sqrt((p.lastOffset.x)**2 + (p.lastOffset.y)**2)
-                p.lastDist = d
-                p.totalDist += d
-                drag?.(p.dragging)
             }
 
             p.mouseReleased = () => {
-                stopDrag?.(p.dragging)
-                p.dragging = undefined
+                if (p.mouse.isDragging) 
+                    stopDrag?.(p.mouse, p)
+                p.mouse.isDragging = false
             }
+
+
 
         }, el)
     })
@@ -308,6 +467,7 @@ function createP5Capture({p}) {
      **/
 
     // start creating the capture
+
     let capture = p.createCapture(p.VIDEO)
     console.log(capture)
 
@@ -316,16 +476,16 @@ function createP5Capture({p}) {
 
     return new Promise((resolve, reject) => {
         let count = 0
-        let maxCount = 50
+        let maxCount = 250
         const intervalId = setInterval(() => {
             if (capture.elt.width > 0) 
                 resolve(capture)
             else if (count >= maxCount) {
                 clearInterval(intervalId);
-                reject()
+                reject("Capture timeout!")
             }
             count++;
-        })
+        }, 40)
     })
 
     // We have to wait until P5 has started the capture,

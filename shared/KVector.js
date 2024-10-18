@@ -3,8 +3,11 @@
 // With a hack at the end to avoid needing to do inheritance so we don't mess up Vue2
 // (no indexing v[0], which is a bit annoying)
 class KVector {
-  static polar(r, theta, phi = 0) {
-    return new KVector(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+ 
+
+	static polar({r, theta, phi = 0, x=0, y=0, z=0}) {
+``
+    return new KVector(r * Math.cos(phi) * Math.cos(theta) + x, r * Math.cos(phi) * Math.sin(theta) + y, r * Math.sin(phi) + z);
   }
 
   static sub(pt0, pt1) {
@@ -49,6 +52,11 @@ class KVector {
   			v1.x + r1*Math.cos(theta1), v1.y + r1*Math.sin(theta1), 
   			v1.x, v1.y)
   }
+
+  static drawLineBetween({p, v0, v1, normalOffset=0,  startOffset=0, endOffset=0, color}) {
+			// TODO normal and offsets
+			p.line(v0.x, v0.y, v1.x, v1.y) 
+	}
 
   /**
    * ===========================================================================
@@ -124,8 +132,11 @@ class KVector {
 	}
 
 	getDistanceTo(v) {
-
-		return Math.sqrt((this.x-v.x)**2 + (this.y-v.y)**2 + (this.z-v.z)**2)
+		let d = (this.x-v.x)**2 + (this.y-v.y)**2
+		if (v.z !== undefined && this.z !== undefined )
+			d += (this.z-v.z)**2
+		// console.log(this.x, v.x, d)
+		return Math.sqrt(d)
 	}
 
 	getAngleTo(v) {
@@ -248,6 +259,12 @@ class KVector {
 		return this
 	}
 
+	setToPolarOffset({r, theta, phi=0, x, y, z}) {
+		this.x = r*Math.cos(theta)*Math.cos(phi) + x
+		this.y = r*Math.sin(theta)*Math.cos(phi) + y
+		this.z = r*Math.sin(phi) + z
+		return this
+	}
 
 
 	setToLerp(v0, v1, pct) {
@@ -279,6 +296,14 @@ class KVector {
 	}
 
 	setToSub(pt0, pt1) {
+		this.x = pt0.x - pt1.x
+		this.y = pt0.y - pt1.y
+		this.z = pt0.z - pt1.z
+		return this
+	}
+
+
+	setToOffset(pt1, pt0) {
 		this.x = pt0.x - pt1.x
 		this.y = pt0.y - pt1.y
 		this.z = pt0.z - pt1.z
@@ -468,8 +493,12 @@ class KVector {
 		p.circle(this.x, this.y, radius)
 	}
 
-
-	drawArrow({p, v, multiplyLength=1, normalOffset=0,  startOffset=0, endOffset=0, color}) {
+	drawLineTo({p, v, multiplyLength=1, normalOffset=0,  startOffset=0, endOffset=0, color}) {
+			// TODO normal and offsets
+			p.line(this.x, this.y, v.x, v.y) 
+	}
+		
+	drawArrow({p, v, multiplyLength=1, normalOffset=0,  startOffset=0, endOffset=0, color, headSize=10}) {
 		
 		// Make points
 		let start = KVector.edgePoint({pt0:this, v, pct: 0, normalOffset, edgeOffset: startOffset})
@@ -479,7 +508,7 @@ class KVector {
 		if (color)
 			p.stroke(...color)
 
-		p.line(...start, ...end)
+		p.line(start.x, start.y, end.x, end.y)
 
 		p.noStroke()
 		if (color) 
@@ -489,8 +518,8 @@ class KVector {
 		p.push()
 		p.translate(...end)
 		p.rotate(v.angle)
-		let d = 10
-		let w = 4
+		let d = headSize
+		let w = headSize*.4
 		p.quad(0,0, 
 			-d, w, 
 			-d*.6, 0, 

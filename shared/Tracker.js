@@ -247,6 +247,8 @@ const Tracker = (function () {
 			return this.landmarks[0].toArray().length
 		}
 
+		
+
 
 		get data() {
 			return this.landmarks.map(lmk => lmk.toArray())
@@ -267,7 +269,7 @@ const Tracker = (function () {
 		}
 
 		get flatData() {
-			return this.arrayData.flat()
+			return this.data.flat()
 		}
 
 		set flatData(data) {
@@ -676,9 +678,9 @@ const Tracker = (function () {
 				doAcquirePoseMetrics,
 
 			};
-			console.log(this.config)
+			// console.log(this.config)
 
-			console.log(`${numHands} hands, ${numFaces} faces, ${numPoses} poses, `)
+			console.log(`Tracker loaded, watching for ${numHands} hands, ${numFaces} faces, ${numPoses} poses, `)
 			this.faces = Array.from({length:numFaces}, ()=> new Face(this))
 			this.hands = Array.from({length:numHands}, ()=> new Hand(this))
 			this.poses = Array.from({length:numPoses}, ()=> new Pose(this))
@@ -703,7 +705,7 @@ const Tracker = (function () {
 		drawSource({p, flip=false, x = 0, y = 0, scale = 1.0}) {
 
 			if (this.source) {
-				console.log(this.source.width, this.source.height)
+				// console.log(this.source.width, this.source.height)
 				p.push()
 				p.translate(x, y)
 				p.scale(scale)
@@ -748,7 +750,8 @@ const Tracker = (function () {
 	 **/
 
 			let visionBundlePath = modulePath  + "vision_bundle.js"
-			console.log("Module path", modulePath, visionBundlePath, modelPaths)
+			console.log("Load tracker modules:")
+			console.log("  Module path", modulePath, visionBundlePath, modelPaths)
 
 			this.mediapipe_module = await import(visionBundlePath);
 			this.vision = await this.mediapipe_module
@@ -761,7 +764,7 @@ const Tracker = (function () {
 				let typeCap = type.charAt(0).toUpperCase() + type.slice(1)
 				let LandmarkerClass = this.mediapipe_module[typeCap + "Landmarker"]
 				
-				console.log("config", this.config, this.config.cpuOrGpuString)
+				// console.log("config", this.config, this.config.cpuOrGpuString)
 				LandmarkerClass.createFromOptions(
 					this.vision,
 					{
@@ -772,12 +775,12 @@ const Tracker = (function () {
 							modelAssetPath
 						},
 					}).then(landmarker => {
-						console.log("Loaded landmarker and model for ", type)
+						// console.log("  Loaded landmarker and model for ", type)
 						this.landmarkers[type] = landmarker
 					}) ;
 
 				})
-			console.log("modules loaded")
+			
 		}
 
 
