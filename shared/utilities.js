@@ -379,7 +379,7 @@ function createP5({w=200,h=200, el, colorMode="HSL",
 
             p.draw = () => {
                 draw(p)
-                p.mouse.hovered = getClosest({x:p.mouse.x, y:p.mouse.y})
+                p.mouse.hovered = getClosest?.({x:p.mouse.x, y:p.mouse.y})
             }
             
 

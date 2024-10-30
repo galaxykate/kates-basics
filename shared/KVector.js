@@ -14,6 +14,13 @@ class KVector {
     return new KVector(pt0.x - pt1.x, pt0.y - pt1.y, pt0.z - pt1.z);
   }
 
+  static lerp(pt0, pt1, pct) {
+    let p = new KVector(0, 0, 0);
+    p.setToLerp(pt0, pt1, pct)
+    return p
+  }
+
+
   static edgePoint(...args) {
     return new KVector().setToEdgePoint(...args);
   }
@@ -128,7 +135,7 @@ class KVector {
 	}
 
 	get magnitude() {
-		return Math.sqrt(this.x ** 2 + this.y**2)
+		return Math.sqrt(this.x ** 2 + this.y**2 + this.z**2)
 	}
 
 	getDistanceTo(v) {

@@ -24,3 +24,10 @@ regions are defined by a single site
 
 A system is when you share UI 
 count, create new, force sliders, etc
+
+
+# Timeseries
+
+checklist
+record multiple streams as one fusion file
+playback the file on whatever is available

@@ -207,16 +207,16 @@ const Tracker = (function () {
 
 
 	class Trackable {
-		constructor(tracker, landmarkCount, dimensionality) {
+		constructor({type, tracker, landmarkCount, dimensionality}) {
 
-
+			this.type = type
 			this.tracker = tracker
 			this.landmarkCount = landmarkCount
 
 			this.idNumber = trackableCount++;
 			this.uid = uuidv4()
 			
-			this.id = this.type + this.idNumber
+			this.id = type + this.idNumber
 			this.idColor = [(this.idNumber * 73) % 360, 100, 50];
 			this.isActive = false;
 
@@ -243,26 +243,22 @@ const Tracker = (function () {
 			this.metaVectors = []
 		}
 
+
+
+		toArray() {
+			return this.landmarks.map(lmk => lmk.toArray())
+		}
+
+
+		toNormalizedArray() {
+			// TODO
+			return this.landmarks.map(lmk => lmk.toArray())
+		}
+
 		get dimensionality() {
 			return this.landmarks[0].toArray().length
 		}
 
-		
-
-
-		get data() {
-			return this.landmarks.map(lmk => lmk.toArray())
-		}
-
-		set data(data) {
-			if (data.length === this.landmarks.length)
-				this.landmarks.forEach((lmk,index) => {
-					lmk.setTo(data[index])
-				})
-			else {
-				throw(`Mismatched array size for ${this}: expected length ${this.landmarks.length}, got ${data.length}`)
-			}
-		}
 
 		get flatDataSize() {
 			return this.landmarkCount*this.dimensionality
@@ -386,8 +382,12 @@ const Tracker = (function () {
 		  // console.log(lmk.x, lmk.y)
 					this.boundingBox[0].x = Math.min(this.boundingBox[0].x, lmk.x)
 					this.boundingBox[0].y = Math.min(this.boundingBox[0].y, lmk.y)
+					this.boundingBox[0].z = Math.min(this.boundingBox[0].z, lmk.z)
 					this.boundingBox[1].x = Math.max(this.boundingBox[1].x, lmk.x)
 					this.boundingBox[1].y = Math.max(this.boundingBox[1].y, lmk.y)
+					this.boundingBox[1].z = Math.max(this.boundingBox[1].z, lmk.z)
+					
+
 				})
 
 		// console.log(this.boundingBox[0].toFixed(2), this.boundingBox[1].toFixed(2))
@@ -463,10 +463,13 @@ const Tracker = (function () {
 	class Face extends Trackable {
   // Data for one face
 		constructor(tracker) {
-			super(tracker, FACE_LANDMARK_COUNT);
-			this.name = "Face" + this.idNumber
-			this.type = "face"
-
+			super({
+				type:"Face", 
+				tracker, 
+				landmarkCount:FACE_LANDMARK_COUNT, 
+				dimensionality:3
+			});
+			
 			this.blendShapes = {};
 			CATEGORIES.forEach((c) => (this.blendShapes[c] = 0));
 
@@ -578,10 +581,12 @@ const Tracker = (function () {
 	class Pose extends Trackable {
   // Data for one face
 		constructor(tracker) {
-			super(tracker, POSE_LANDMARK_COUNT);
-			this.name = "Pose" + this.idNumber
-			this.type = "pose"
-			this.tracker = tracker
+			super({
+				type:"Pose", 
+				tracker, 
+				landmarkCount:POSE_LANDMARK_COUNT, 
+				dimensionality:3
+			});
 
 		}
 
@@ -599,29 +604,78 @@ const Tracker = (function () {
 	class Hand extends Trackable {
   // Data for one face
 		constructor(tracker) {
-			super(tracker, HAND_LANDMARK_COUNT);
-			this.name = "Hand" + this.idNumber
-			this.type = "hand"
+			super({
+				tracker, 
+				type:"Hand", 
+				landmarkCount:HAND_LANDMARK_COUNT, 
+				dimensionality:3
+			});
+			
 			this.handedness = undefined;
-			this.tracker = tracker
 
 			this.fingers = Array.from({length:5}, (x, i)=> {
 				let joints = CONTOURS.fingers[i].map(index => this.landmarks[index])
 				return {
+					pinchAmt: 0,
 					dir:this.createMetaVector("dir" + i) ,
 					joints,
-					tip: joints[joints.length - 1]
+					tip: joints[joints.length - 1],
+					thumbPinch: this.createMetaVector("thumbPinch" + i),
 				}
 
 			})
+
+			this.pinches = []
+
 		}
 
 		calculateMetaTrackingData() {
 			super.calculateMetaTrackingData()
+
+
+
 	// console.log("hand data")
 			this.fingers.forEach((finger,index) => {
 
+
+				let scale = remap(finger.tip.z, -50, 300, 1, 0)
+				finger.scale = scale**4
+				// How much bigger are x y than they seem?
+				
+				let thumbTip = this.landmarks[4]
 				setToDifference(finger.dir, finger.tip, finger.joints[2])
+				setToDifference(finger.thumbPinch, finger.tip, thumbTip)
+
+				// Is this finger pinching?
+
+				// pixels are more distance at the back than at the front?
+				
+				finger.pinchAmt = Math.max(0, 40 - finger.thumbPinch.magnitude/finger.scale)
+				if (finger.pinchAmt > 0) {
+
+					if (!finger.isPinching) {
+						// start pinch
+						finger.isPinching = true
+						finger.onStartPinch?.(finger)
+						let start = KVector.lerp(thumbTip, finger.tip, .5)
+						finger.pinch = {
+							start,
+							pts: [],
+						}
+					}
+					finger.onPinchMove?.(finger)
+					finger.pinch.pts.push(KVector.lerp(thumbTip, finger.tip, .5))
+				} else {
+					// Stop pinch
+					finger.isPinching = false
+					finger.onStopPinch?.(finger)
+					finger.pinch = undefined
+				}
+				
+
+				// Check for pinching
+				// Are any fingers pinching with the thumb?
+			
 			})
 
 			let square = this.fingers.map(f => f.joints[0]).concat(this.fingers.map(f => f.joints[0]))
@@ -652,10 +706,18 @@ const Tracker = (function () {
 
 		} = {}) {
 
+			if (!createLandmark)
+				createLandmark = function(x,y,z) {
+					return new KVector(x, y, z)
+				}
+
 			this.scale = 1
 
-
-			this.loadModels({modulePath, modelPaths})
+			if (modulePath && modelPaths)
+				this.loadModels({modulePath, modelPaths})
+			else {
+				console.log(`Missing module path ${modulePath} or model paths (${modelPaths})`)
+			}
 
 			this.maxHistory = maxHistory
 
@@ -756,15 +818,15 @@ const Tracker = (function () {
 			this.mediapipe_module = await import(visionBundlePath);
 			this.vision = await this.mediapipe_module
 			.FilesetResolver.forVisionTasks(modulePath);
-
+			
 	// Load all the model files
 			Object.entries(modelPaths).forEach(([type,path]) => {
 		// Load this model
 				let modelAssetPath = modelPaths[type]
+
 				let typeCap = type.charAt(0).toUpperCase() + type.slice(1)
 				let LandmarkerClass = this.mediapipe_module[typeCap + "Landmarker"]
 				
-				// console.log("config", this.config, this.config.cpuOrGpuString)
 				LandmarkerClass.createFromOptions(
 					this.vision,
 					{
@@ -785,6 +847,10 @@ const Tracker = (function () {
 
 
 		async detect() {
+			if (!this.source) {
+				console.warn("no video source provided!")
+				return
+			}
 			let t = performance.now();
 	// Make sure we are not making double predictions?
 			if (t - this.lastPredictionTime > 10) {

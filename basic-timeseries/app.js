@@ -5,62 +5,84 @@
 /* globals Vue, p5, Tracker */
 // GLOBAL VALUES, CHANGE IF YOU WANT
 
-const HAND_SCHEMA = {
-	count: 21,
-	dimensions: ["x", "y", "z"],
-	range: [-1,1]
-}
+const MUSIC_SCHEMA = new Schema({
+	id: "fftmusic",
+	count: 100,
+	dim: 1,
+	range: [0,256],
+})
 
-const FACE_SCHEMA = {
-	count: 478,
-	dimensions: ["x", "y", "z"],
-	range: [-1,1]
-}
+const HSLA_SCHEMA = new Schema({
+	id: "hsla360",
+	dim: 4,
+	ranges: [[0,360], [0,100], [0,100], [0,1]],
+})
+
+const RGB_SCHEMA = new Schema({
+	id: "rgb256",
+	dim: 3,
+	range: [0, 256],
+})
+
+
+
 
 let app = {
 	
-	timeSeries: null,
-	timeSeriesController: null,
+	tracker: new Tracker({
+		numFaces:1,
+		numHands:2,
+		numPoses: 0,
+	}),
 
 	// What trackables do we have?
 	// stuff with different inputs
-	trackables: [
-		{
-			id: "noises",
-			schema: {
-				count: 3,
-				dimensions: 5,
-				range: [-1,1]
-			}
-		},
-		{
-			id: "music",
-			schema: {
-				count: 100,
-				dimensions: 1,
-				range: [0,255]
-			}
-		},
-		{
-			id:"hand0",
-			schema: HAND_SCHEMA
-		},
-		{
-			id:"hand1",
-			schema: HAND_SCHEMA
-		},
-		{
-			id:"face0",
-			schema: FACE_SCHEMA
-		},
-	],
+	dataFusion: new DataFusion(),
 
 	init() {
+		console.log(this.tracker.trackables)
+		
+		
+
+		this.tracker.trackables.forEach((trackable,index) => {
+			console.log(index, trackable)
+
+			let trackerSchema = new Schema({
+				id: "trackable",
+				count: trackable.landmarks.length,
+				dim: 3,
+			})
+
+			this.dataFusion.addStream({
+				id: trackable.id,
+				data: trackable.landmarks,
+				schema: trackerSchema
+			})
+		})
+
+	
+		// Create and store the music stream
+		app.music = this.dataFusion.addStream({
+			id: "music",
+			data: app.music,
+			schema: MUSIC_SCHEMA
+		}).data
+
+		
+		
+		this.dataFusion.setToNoise(this.time.t)
 		
 	},
 
 	update() {
 		this.time.update()
+
+		// console.log(this.time.frame)
+		let t0 = Date.now()
+		let count = 10
+		
+		let t1 = Date.now()
+		// console.log(t1-t0)
 	},
 
 	time:{
@@ -96,7 +118,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
 		template: `<div id="app">
 			<div class="columns"> 
 				<div class="column">
-					
+					<datafusion :fusion="app.dataFusion" /> 
 				</div>
 
 				<div class="column">
@@ -116,6 +138,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
 				draw(p) {
 					// Update
 					app.update()
+
+					app.dataFusion.draw({p, w:p.width,h:p.height})
 				}, 
 				setup(p) {
 
