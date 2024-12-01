@@ -1,4 +1,26 @@
+function drawData({p, x, y, data, size=10, horizontal=false}) {
+    if (!data)
+        throw("No data: " + data)
+    let dim = data[0].length || 1
+    for (var i = 0; i < data.length; i++) {
+        for (var j = 0; j < dim; j++) {
+            let v = Array.isArray(data[i])?data[i][j]:data[i]
+            p.fill(v * 100);
+            let x2 = size * i
+            let y2 = size * j
+            if (horizontal) 
+                x2 = [y2, y2=x2][0] // hack to swap values
 
+            p.rect(x2 + x, y2 + y, size, size);
+        }
+    }
+    return dim*size
+}
+
+
+function arrayToFixed(arr, n) {
+    return "[" + (arr.map(a => a.toFixed(2))).join(",") + "]"
+}
 
 function flatDataRowsToBinary(flatDataRows) {
    console.log("To binary", flatDataRows)
@@ -73,6 +95,10 @@ class Box {
         } else {
             throw new Error("Invalid box definition");
         }
+    }
+
+    draw(p, border=0) {
+        p.rect(this.x0 - border, this.y0 - border, this.w + border*2, this.h + border*2)
     }
 
     get w() {

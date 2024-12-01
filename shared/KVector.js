@@ -130,6 +130,10 @@ class KVector {
     };
   }
 
+  map(fxn) {
+  	return [this.x, this.y, this.z].map(fxn)
+  }
+
   get angle() {
 		return Math.atan2(this.y, this.x)
 	}

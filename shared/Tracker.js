@@ -334,6 +334,13 @@ const Tracker = (function () {
 
 
 		setLandmarksFromTracker(landmarks, imageDimensions) {
+			if (landmarks === undefined) {
+
+				this.isActive = false
+				return
+			}
+
+			this.isActive = true
 	// console.log("set to landmarks", landmarks)
 
 	// Store the history of this landmark
@@ -357,18 +364,18 @@ const Tracker = (function () {
 				v.history = v.history.slice(0, this.tracker.maxHistory)
 			})
 
-	// Save out the past data
-			this.calculateMetaTrackingData?.();
 		}
 
-		drawDebugData(p) {
+		drawDebugData({p, flip=false, x = 0, y = 0, scale = 1.0}) {
 
 			p.fill(...this.idColor);
 			p.noStroke()
 	// console.log(this.landmarks)
 			this.landmarks.forEach((pt) => {
 	  // Landmarks are relative to the image size
-				p.circle(pt.x, pt.y, 3);
+				let x0 = x + pt.x*scale
+				let y0 = y + pt.y*scale
+				p.circle(x0, y0, 3);
 			});
 		}
 
@@ -719,7 +726,11 @@ const Tracker = (function () {
 				console.log(`Missing module path ${modulePath} or model paths (${modelPaths})`)
 			}
 
-			this.maxHistory = maxHistory
+			this.rawLandmarkData = {
+				"hand":undefined,
+				"pose":undefined,
+				"face":undefined,
+			}
 
 			this.createLandmark = createLandmark
 
@@ -728,7 +739,7 @@ const Tracker = (function () {
 			}
 
 
-			this.isActive = false;
+			this.isActive = true;
 			this.config = {
 				doAcquireFaceMetrics: true,
 				cpuOrGpuString:gpu?"GPU":CPU /* "GPU" or "CPU" */,
@@ -747,9 +758,8 @@ const Tracker = (function () {
 			this.hands = Array.from({length:numHands}, ()=> new Hand(this))
 			this.poses = Array.from({length:numPoses}, ()=> new Pose(this))
 
-			this.landmarkers = {}
-
-			this.afterDetectFxns = []
+			// A place to store the landmarking models
+			this.landmarkerModels = {}
 
 			this.playbackInterval = undefined;
 			this.frameIndex = 0;
@@ -759,10 +769,6 @@ const Tracker = (function () {
 			return [this.source.width, this.source.height]
 		}
 
-	// Subscribe to detections
-		onDetect(fxn) {
-			this.afterDetectFxns.push(fxn)
-		}
 
 		drawSource({p, flip=false, x = 0, y = 0, scale = 1.0}) {
 
@@ -782,19 +788,10 @@ const Tracker = (function () {
 			}
 		}
 
-		drawDebugData(p) {
-
-
-			this.faces.forEach((face) => {
-				if (face.isActive) face.drawDebugData(p);
-			});
-			this.hands.forEach((hand) => {
-				if (hand.isActive) hand.drawDebugData(p);
-			});
-
-			this.poses.forEach((pose) => {
-				if (pose.isActive) pose.drawDebugData(p);
-			});
+		drawDebugData(settings) {
+			this.trackables.forEach(trackable => {
+				if (trackable.isActive) trackable.drawDebugData(settings)
+			})
 		}
 
 		get trackables() {
@@ -838,114 +835,142 @@ const Tracker = (function () {
 						},
 					}).then(landmarker => {
 						// console.log("  Loaded landmarker and model for ", type)
-						this.landmarkers[type] = landmarker
+						this.landmarkerModels[type] = landmarker
 					}) ;
 
 				})
 			
 		}
 
+		async runAllLandmarkModels() {
+		    let data = {};
 
-		async detect() {
+		    for (let key of ["hand", "face", "pose"]) {
+		        // Detect this model from the source
+		        let model = this.landmarkerModels[key];
+		        let startTimeMs = performance.now();
+
+		        if (model) {
+		            // Await the asynchronous operation
+		            let detectionResult = await model.detectForVideo(this.source.elt, startTimeMs);
+
+		            // Store the raw data
+		            // Some models store it differently
+		            let lmKey = key=="face"?"faceLandmarks":"landmarks"
+		            data[key] = detectionResult[lmKey]
+		        }
+		    }
+
+		    return data;
+		}
+
+		async detect({afterLandmarkUpdate,afterMetaUpdate}) {
 			if (!this.source) {
 				console.warn("no video source provided!")
 				return
 			}
 			let t = performance.now();
-	// Make sure we are not making double predictions?
+			// Make sure we are not making double predictions?
 			if (t - this.lastPredictionTime > 10) {
 
-				this.predictFace();
-				this.predictHand();
-				this.predictPose();
+				console.log("\nStart prediction");
+
+				// First, get the raw landmark predictions
+			    let allLandmarks = await this.runAllLandmarkModels()
+			    console.log("-  prediction complete");
 
 
-				this.afterDetect()
+			    Object.entries(allLandmarks).forEach(([type,newLandmarkData]) => {
+			    	// Ok, we are looking at all of a type (hands, faces, etc)
+			    	// For each active landmark data we have, 
+			    	let trackables = this[type + "s"]
+			    	
+			    	trackables.forEach((trackable, index) => {
+			    		// find the right trackable and update its landmark data
+			    		let newData = newLandmarkData[index]
+			    		// The goal here is to never have a time when 
+			    		// the data has not gotten overridden via the afterLandmarkUpdate,
+			    		// e.g. if we have playback overlays
+			    		trackable.setLandmarksFromTracker(newData, this.sourceDimensions)
+			    		
+			    	})
+			    })
 
-	  // Probably wrong with async, may be a frame behind
-				this.afterUpdate();
+			    afterLandmarkUpdate?.({tracker:this})
+			    		
+
+			    this.trackables.forEach(trackable => {
+			    	trackable.calculateMetaTrackingData()
+			    	
+			    })
+			    afterMetaUpdate?.({tracker:this})
+
+			    // // Assign the predicted landmarks to each trackable
+			    // ["hand", "face", "pose"].forEach(key => {
+			    // 	let allTrackables
+			    // 	this[key + 's'].forEach((trackable,index) => {
+			    // 		let data =
+			    // 		console.log(key, trackable.id)
+			    // 	})
+			    // })
 			}
 
 			this.lastPredictionTime = t;
 		}
 
-		async afterUpdate() {
-
-		}
-
-		async afterDetect() {
-			this.afterDetectFxns.forEach(fxn => fxn(this))
-		}
 
 
-		async predictHand() {
-			let startTimeMs = performance.now();
-			let data = this.landmarkers.hand?.detectForVideo(this.source.elt, startTimeMs);
-			if (data) {
-				this.hands.forEach((hand, handIndex) => {
-					let landmarks = data.landmarks[handIndex];
-					
-					if (landmarks) {
-						hand.isActive = true;
-						hand.handedness = data.handednesses[handIndex];
+	// 	async predictHand() {
+			
+	// 	}
 
-						hand.setLandmarksFromTracker(landmarks, this.sourceDimensions);
-					} else {
-		  // No face active here
-						hand.isActive = false;
-					}
-				});
-			}
-		}
+	// 	async predictFace() {
 
-		async predictFace() {
+	// 		let startTimeMs = performance.now();
+	// 		let data = this.landmarkers.face?.detectForVideo(this.source.elt, startTimeMs);
+		
+	// 		if (data) {
+	// 			this.faces.forEach((face, faceIndex) => {
+	// 				let landmarks = data.faceLandmarks[faceIndex];
+	// 				let blendShapes = data.faceBlendshapes[faceIndex];
 
-			let startTimeMs = performance.now();
+	// 	// Set the face to these landmarks
+	// 				if (landmarks) {
+	// 					face.isActive = true;
+	// 					face.setLandmarksFromTracker(landmarks, this.sourceDimensions);
+	// 				} else {
+	// 	  // No face active here
+	// 					face.isActive = false;
+	// 				}
+	// 			});
+	// 		}
+	// 	}
 
-			let data = this.landmarkers.face?.detectForVideo(this.source.elt, startTimeMs);
+	// 	async predictPose() {
+	// 		let startTimeMs = performance.now();
+	// 		let data = this.landmarkers.pose?.detectForVideo(
+	// 			this.source.elt,
+	// 			startTimeMs
+	// 			);
 
-			if (data) {
-				this.faces.forEach((face, faceIndex) => {
-					let landmarks = data.faceLandmarks[faceIndex];
-					let blendShapes = data.faceBlendshapes[faceIndex];
+	// 		if (data) {
 
-		// Set the face to these landmarks
-					if (landmarks) {
-						face.isActive = true;
-						face.setLandmarksFromTracker(landmarks, this.sourceDimensions);
-					} else {
-		  // No face active here
-						face.isActive = false;
-					}
-				});
-			}
-		}
+	  // // Set each pose to the right data
+	// 			this.poses.forEach((pose, poseIndex) => {
+	// 				let landmarks = data.landmarks[poseIndex];
 
-		async predictPose() {
-			let startTimeMs = performance.now();
-			let data = this.landmarkers.pose?.detectForVideo(
-				this.source.elt,
-				startTimeMs
-				);
+	// 	// Set the face to these landmarks
+	// 				if (landmarks) {
+	// 					pose.isActive = true;
+	// 					pose.setLandmarksFromTracker(landmarks, this.sourceDimensions);
+	// 				} else {
+	// 	  // No pose active here
+	// 					pose.isActive = false;
+	// 				}
+	// 			});
+	// 		}
 
-			if (data) {
-
-	  // Set each pose to the right data
-				this.poses.forEach((pose, poseIndex) => {
-					let landmarks = data.landmarks[poseIndex];
-
-		// Set the face to these landmarks
-					if (landmarks) {
-						pose.isActive = true;
-						pose.setLandmarksFromTracker(landmarks, this.sourceDimensions);
-					} else {
-		  // No pose active here
-						pose.isActive = false;
-					}
-				});
-			}
-
-		}
+	// 	}
 
 	}
 
