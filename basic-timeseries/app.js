@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
 		template: `<div id="app">
 			<div class="columns"> 
 				<div class="column">
-					<dataslice-editor :dataslice="app.dataSlice" /> 
+					<dataslice :slice="slice" /> 
 					<data-recorder 
 						:slice="app.dataSlice" 
 						:globalTime="app.time"
