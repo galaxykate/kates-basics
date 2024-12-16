@@ -240,9 +240,14 @@ const Tracker = (function () {
 				}
 				);
 
-			if (this.constructor.POSITIONS) {
+			this.mappingPositions = this.constructor.POSITIONS.map(v => new KVector(v))
+			if (mappingPos) {
 				console.log("HAS POSITIONS")
-				this.landmarks.forEach((lmk,i)  => lmk.mappingPosition = new KVector(this.constructor.POSITIONS[i]))
+				this.landmarks.forEach((lmk,i) => lmk.mappingPosition = mappingPositions[i])
+
+				let voronoi = new Voronoi()
+				let diagram = voronoi.compute(mappingPositions, {xl:-1, xr:1, yt: -1, yb: 1});
+				console.log(diagram)
 			}
 
 			this.metaVectors = []
