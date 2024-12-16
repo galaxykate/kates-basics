@@ -5,6 +5,23 @@ have a set of inputs of arrays-of-arrays than can be fused into a single data fo
 ### Log
 
 ----
+Dec 16
+
+----
+Dec 15
+
+Give every tracker point a cannonical position
+easily convert any tracker point into a screenrelative or boudning box relative point
+note - whoops, didnt do any of that in favor of another bad-idea refactor
+
+----
+Dec 6
+
+Switched the way it works to the fusion being a concatenation of all the slices
+Goal before train: store and see history
+
+
+----
 Nov 30
 Understand how data flows through the system
 We need a way to overlay the tracking data, to display something else

@@ -222,6 +222,7 @@ const Tracker = (function () {
 
 			this.metaVectors = []
 
+
 			this.boundingBox = [this.createMetaVector("bbMin"),this.createMetaVector("bbMax")]
 			this.center = this.createMetaVector("center")
 	// Create the landmarks
@@ -239,7 +240,11 @@ const Tracker = (function () {
 				}
 				);
 
-	// Record the landmarks
+			if (this.constructor.POSITIONS) {
+				console.log("HAS POSITIONS")
+				this.landmarks.forEach((lmk,i)  => lmk.mappingPosition = new KVector(this.constructor.POSITIONS[i]))
+			}
+
 			this.metaVectors = []
 		}
 
@@ -250,11 +255,6 @@ const Tracker = (function () {
 		}
 
 
-		toNormalizedArray() {
-			// TODO
-			return this.landmarks.map(lmk => lmk.toArray())
-		}
-
 		get dimensionality() {
 			return this.landmarks[0].toArray().length
 		}
@@ -263,6 +263,7 @@ const Tracker = (function () {
 		get flatDataSize() {
 			return this.landmarkCount*this.dimensionality
 		}
+
 
 		get flatData() {
 			return this.data.flat()
@@ -280,6 +281,57 @@ const Tracker = (function () {
 			})
 		}
 
+		//---------------------------------------------------
+		// Remapping
+
+		get screenNormalizedLandmarks() {
+			return this.landmarks.map(lm => this.screenNormalizeLandmark(lm))
+		}
+
+		screenNormalizeLandmark(lm) {
+			let src = this.tracker.source
+			if (!src)
+				return new KVector()
+
+			return new KVector(
+				remap(lm.x, 0, src.width, -1, 1), 
+				remap(lm.y, 0, src.height, -1, 1),
+				remap(lm.z, -100, 100, -1, 1))
+		}
+
+
+		get boundingBoxNormalizedLandmarks() {
+			return this.landmarks.map(lm => this.boundingBoxNormalizedLandmark(lm))
+		}
+
+		boundingBoxNormalizedLandmark(lm) {
+			let bb = this.boundingBox
+			return new KVector(
+				remap(lm.x, bb[0].x, bb[1].x, -1, 1), 
+				remap(lm.y, bb[0].y, bb[1].y, -1, 1),
+				remap(lm.z, bb[0].z, bb[1].z, -1, 1))
+			
+		}
+
+		get axisNormalizedLandmarks() {
+			// Rotate all landmarks around the ...nose?
+			let angle = this.axis[0].getAngleTo(this.axis[1])
+			return this.landmarks.map(lm => {
+				let v = KVector.sub(lm, this.center)
+
+				v.mult(.01)
+				v.rotate(-angle + Math.PI/2)
+				// console.log(v.toFixed(2))
+				return v
+				
+			})
+			
+		}
+
+		
+
+		//---------------------------------------------------
+		
 		getFlatDataByIndices({indices, dimensionality}) {
 			return indices.map(index => {
 				this.landmarks[index].toArray().slice(0, dimensionality)
@@ -300,13 +352,11 @@ const Tracker = (function () {
 		get h() {
 			return this.boundingBox[1].y - this.boundingBox[0].y
 		}
+		get d() {
+			return this.boundingBox[1].z - this.boundingBox[0].z
+		}
 
-		get x() {
-			return this.boundingBox[0].x 
-		}
-		get y() {
-			return this.boundingBox[0].y 
-		}
+
 		get flatStringData() {
 			return this.flatData.map(s => s.toFixed(2)).join(",")
 		}
@@ -370,7 +420,6 @@ const Tracker = (function () {
 
 			p.fill(...this.idColor);
 			p.noStroke()
-	// console.log(this.landmarks)
 			this.landmarks.forEach((pt) => {
 	  // Landmarks are relative to the image size
 				let x0 = x + pt.x*scale
@@ -381,13 +430,11 @@ const Tracker = (function () {
 
 		calculateMetaTrackingData() {
 			if (this.isActive) {
-		// console.log(this.boundingBox)
-				this.boundingBox[0].setTo(999999,999999)
-				this.boundingBox[1].setTo(-999999,-999999)
+				this.boundingBox[0].setTo(999999,999999, 99999)
+				this.boundingBox[1].setTo(-999999,-999999, -99999)
 
 				this.landmarks.forEach(lmk => {
-		  // console.log(lmk.x, lmk.y)
-					this.boundingBox[0].x = Math.min(this.boundingBox[0].x, lmk.x)
+		 			this.boundingBox[0].x = Math.min(this.boundingBox[0].x, lmk.x)
 					this.boundingBox[0].y = Math.min(this.boundingBox[0].y, lmk.y)
 					this.boundingBox[0].z = Math.min(this.boundingBox[0].z, lmk.z)
 					this.boundingBox[1].x = Math.max(this.boundingBox[1].x, lmk.x)
@@ -397,8 +444,7 @@ const Tracker = (function () {
 
 				})
 
-		// console.log(this.boundingBox[0].toFixed(2), this.boundingBox[1].toFixed(2))
-
+		
 			}
 		}
 
@@ -471,7 +517,7 @@ const Tracker = (function () {
   // Data for one face
 		constructor(tracker) {
 			super({
-				type:"Face", 
+				type:"face", 
 				tracker, 
 				landmarkCount:FACE_LANDMARK_COUNT, 
 				dimensionality:3
@@ -489,10 +535,12 @@ const Tracker = (function () {
 
 
 
+
 	// Easy access
 			this.forehead = this.landmarks[CONTOURS.centerLine[0]]
 			this.nose = this.landmarks[CONTOURS.centerLine[9]]
 			this.chin = this.landmarks[CONTOURS.centerLine[26]]
+			this.axis = [this.forehead, this.chin]
 
 			this.side = [{},{}]
 			this.side.forEach((side,i) => {
@@ -574,11 +622,12 @@ const Tracker = (function () {
 			setToDifference(this.dirWidth, this.side[1].ear, this.side[0].ear)
 			setToDifference(this.dirLength, this.chin, this.forehead)
 
+			setToAverage(this.center, [this.chin, this.forehead])
 
-			this.center.x = this.x + this.w/2
-			this.center.y = this.y + this.h/2
 		}
 	}
+	Face.LANDMARK_COUNT = 478
+	Face.POSITIONS = [[0.00,0.33,-0.08],[0.02,0.11,-0.26],[0.01,0.16,-0.11],[0.08,-0.15,-0.20],[0.02,0.04,-0.28],[0.02,-0.07,-0.27],[0.01,-0.33,-0.14],[0.48,-0.44,0.08],[0.01,-0.56,-0.11],[0.01,-0.66,-0.13],[-0.00,-0.95,-0.12],[0.00,0.36,-0.07],[-0.00,0.38,-0.05],[0.00,0.39,-0.03],[-0.00,0.50,-0.00],[-0.00,0.53,-0.01],[-0.00,0.57,-0.02],[-0.00,0.61,-0.01],[-0.00,0.68,0.05],[0.02,0.15,-0.22],[0.09,0.13,-0.15],[0.72,-0.69,0.31],[0.29,-0.37,0.03],[0.36,-0.37,0.03],[0.43,-0.37,0.05],[0.51,-0.41,0.10],[0.23,-0.38,0.03],[0.41,-0.59,0.00],[0.32,-0.57,0.00],[0.49,-0.57,0.02],[0.53,-0.54,0.05],[0.57,-0.36,0.13],[0.29,0.74,0.15],[0.51,-0.47,0.10],[0.75,-0.41,0.36],[0.64,-0.42,0.18],[0.37,-0.03,0.00],[0.10,0.31,-0.07],[0.09,0.37,-0.04],[0.19,0.32,-0.03],[0.25,0.32,0.02],[0.16,0.36,-0.01],[0.22,0.35,0.04],[0.35,0.43,0.14],[0.09,0.11,-0.25],[0.09,0.04,-0.27],[0.62,-0.60,0.06],[0.21,-0.21,-0.02],[0.24,0.04,-0.11],[0.24,-0.00,-0.10],[0.56,-0.06,0.08],[0.09,-0.06,-0.25],[0.48,-0.67,-0.04],[0.57,-0.65,0.00],[0.66,-0.80,0.19],[0.17,-0.59,-0.09],[0.25,-0.53,0.01],[0.40,0.34,0.14],[0.67,0.25,0.58],[0.19,0.09,-0.09],[0.14,0.12,-0.09],[0.32,0.35,0.13],[0.30,0.35,0.12],[0.60,-0.69,0.02],[0.24,0.07,-0.08],[0.36,-0.66,-0.08],[0.37,-0.71,-0.10],[0.40,-0.93,-0.03],[0.64,-0.74,0.09],[0.39,-0.81,-0.07],[0.66,-0.63,0.10],[0.69,-0.65,0.20],[0.10,0.34,-0.06],[0.18,0.34,-0.02],[0.23,0.34,0.03],[0.17,0.10,-0.08],[0.31,0.35,0.13],[0.28,0.41,0.10],[0.29,0.36,0.12],[0.16,0.09,-0.17],[0.21,0.36,0.04],[0.15,0.37,0.01],[0.08,0.38,-0.02],[0.11,0.67,0.06],[0.10,0.60,0.00],[0.10,0.56,-0.01],[0.09,0.52,0.00],[0.08,0.49,0.01],[0.20,0.44,0.06],[0.22,0.45,0.06],[0.23,0.46,0.06],[0.25,0.48,0.07],[0.32,0.24,0.03],[0.74,-0.13,0.61],[0.02,0.16,-0.15],[0.24,0.40,0.10],[0.26,0.41,0.10],[0.11,0.15,-0.09],[0.22,0.10,-0.04],[0.12,0.14,-0.09],[0.28,-0.17,0.00],[0.40,-0.13,0.03],[0.25,0.02,-0.07],[0.57,-0.88,0.07],[0.54,-0.80,0.01],[0.51,-0.73,-0.04],[0.29,0.52,0.11],[0.20,-0.68,-0.12],[0.21,-0.80,-0.11],[0.22,-0.94,-0.10],[0.48,-0.38,0.07],[0.64,-0.31,0.16],[0.19,-0.39,0.04],[0.59,-0.51,0.09],[0.17,-0.24,-0.05],[0.20,0.03,-0.17],[0.70,-0.26,0.23],[0.59,-0.25,0.12],[0.51,-0.22,0.07],[0.38,-0.23,0.04],[0.28,-0.25,0.02],[0.21,-0.28,0.00],[0.08,-0.32,-0.11],[0.69,-0.11,0.23],[0.64,-0.51,0.12],[0.06,0.14,-0.22],[0.21,-0.13,-0.04],[0.77,-0.43,0.53],[0.16,-0.31,-0.01],[0.26,0.02,-0.01],[0.54,-0.46,0.11],[0.20,-0.02,-0.15],[0.71,0.05,0.60],[0.19,-0.41,0.05],[0.15,-0.05,-0.21],[0.56,0.49,0.33],[0.55,0.57,0.42],[0.73,-0.12,0.42],[0.62,0.36,0.37],[0.72,-0.54,0.29],[0.30,0.83,0.19],[0.05,0.16,-0.15],[0.27,-0.08,-0.02],[0.69,-0.41,0.23],[0.42,-0.42,0.05],[0.36,-0.41,0.04],[0.29,0.42,0.11],[0.67,0.03,0.26],[0.17,0.97,0.20],[0.39,0.80,0.30],[0.47,0.70,0.36],[0.00,-0.79,-0.13],[-0.00,1.00,0.18],[0.30,-0.41,0.03],[0.25,-0.41,0.04],[0.21,-0.41,0.05],[0.68,-0.53,0.17],[0.26,-0.48,0.03],[0.32,-0.51,0.02],[0.39,-0.52,0.02],[0.45,-0.52,0.04],[0.48,-0.50,0.06],[0.75,-0.57,0.43],[0.46,-0.43,0.07],[0.01,0.22,-0.09],[0.25,0.21,-0.02],[0.19,0.08,-0.11],[0.12,0.21,-0.08],[0.01,-0.45,-0.11],[0.48,0.61,0.29],[0.40,0.72,0.24],[0.17,0.91,0.14],[0.61,0.43,0.50],[0.22,-0.44,0.04],[0.13,-0.20,-0.12],[0.00,0.95,0.12],[0.29,0.90,0.25],[0.71,0.04,0.43],[0.15,0.47,0.03],[0.16,0.49,0.03],[0.17,0.52,0.02],[0.18,0.55,0.04],[0.22,0.61,0.08],[0.26,0.35,0.08],[0.28,0.34,0.08],[0.29,0.33,0.08],[0.37,0.28,0.08],[0.60,0.09,0.16],[0.12,-0.29,-0.08],[0.15,-0.46,0.00],[0.19,-0.46,0.03],[0.25,0.36,0.09],[0.61,0.26,0.26],[0.10,-0.45,-0.07],[0.25,0.66,0.12],[0.02,-0.16,-0.22],[0.08,-0.23,-0.16],[0.02,-0.24,-0.18],[0.17,-0.09,-0.11],[0.00,0.86,0.08],[0.00,0.76,0.07],[0.13,0.73,0.09],[0.41,0.46,0.17],[0.32,0.07,0.01],[0.34,0.57,0.15],[0.47,0.05,0.04],[0.38,0.14,0.04],[0.52,0.16,0.10],[0.16,0.83,0.10],[0.21,-0.06,-0.07],[0.47,0.52,0.22],[0.38,0.64,0.20],[0.46,0.35,0.16],[0.66,0.16,0.30],[0.54,0.36,0.21],[0.67,0.21,0.43],[0.43,0.22,0.09],[0.17,-0.16,-0.08],[0.18,0.07,-0.18],[0.22,0.07,-0.12],[0.15,0.03,-0.22],[0.21,-0.54,-0.02],[0.34,-0.60,-0.02],[0.44,-0.61,-0.01],[0.52,-0.60,0.01],[0.57,-0.56,0.05],[0.59,-0.44,0.14],[0.75,-0.26,0.39],[0.53,-0.33,0.10],[0.46,-0.30,0.07],[0.37,-0.30,0.05],[0.28,-0.31,0.03],[0.22,-0.33,0.03],[0.17,-0.35,0.02],[0.76,-0.28,0.59],[0.22,0.08,-0.09],[0.13,-0.13,-0.16],[0.14,0.09,-0.22],[0.10,0.12,-0.20],[0.13,0.10,-0.20],[0.20,0.10,-0.07],[0.09,0.14,-0.21],[0.07,0.15,-0.15],[0.17,-0.41,0.04],[0.14,-0.38,0.01],[0.12,-0.36,-0.03],[0.50,-0.48,0.08],[0.55,-0.50,0.08],[-0.04,-0.15,-0.21],[-0.50,-0.43,0.05],[-0.06,0.13,-0.15],[-0.76,-0.68,0.25],[-0.30,-0.36,0.01],[-0.37,-0.36,0.01],[-0.44,-0.36,0.02],[-0.53,-0.40,0.06],[-0.24,-0.37,0.01],[-0.42,-0.57,-0.03],[-0.33,-0.56,-0.02],[-0.50,-0.56,-0.01],[-0.55,-0.52,0.01],[-0.59,-0.35,0.09],[-0.30,0.75,0.13],[-0.53,-0.45,0.06],[-0.79,-0.40,0.31],[-0.67,-0.40,0.13],[-0.37,-0.02,-0.02],[-0.10,0.31,-0.08],[-0.10,0.37,-0.05],[-0.19,0.32,-0.05],[-0.26,0.32,0.00],[-0.17,0.36,-0.02],[-0.24,0.35,0.02],[-0.37,0.44,0.11],[-0.04,0.11,-0.25],[-0.05,0.04,-0.27],[-0.64,-0.58,0.01],[-0.21,-0.20,-0.04],[-0.22,0.05,-0.13],[-0.22,0.00,-0.11],[-0.58,-0.05,0.04],[-0.05,-0.06,-0.25],[-0.48,-0.65,-0.07],[-0.58,-0.63,-0.04],[-0.69,-0.79,0.14],[-0.16,-0.58,-0.10],[-0.26,-0.52,-0.00],[-0.43,0.34,0.11],[-0.74,0.26,0.53],[-0.17,0.09,-0.10],[-0.11,0.12,-0.10],[-0.35,0.35,0.11],[-0.33,0.35,0.10],[-0.61,-0.67,-0.02],[-0.23,0.07,-0.09],[-0.35,-0.64,-0.10],[-0.36,-0.70,-0.12],[-0.41,-0.92,-0.06],[-0.65,-0.73,0.05],[-0.38,-0.80,-0.09],[-0.68,-0.61,0.05],[-0.72,-0.64,0.15],[-0.10,0.34,-0.07],[-0.18,0.34,-0.04],[-0.25,0.34,0.01],[-0.16,0.10,-0.09],[-0.34,0.35,0.10],[-0.30,0.41,0.08],[-0.32,0.36,0.10],[-0.13,0.09,-0.18],[-0.22,0.36,0.03],[-0.16,0.37,-0.00],[-0.09,0.38,-0.02],[-0.12,0.66,0.05],[-0.10,0.60,-0.00],[-0.10,0.56,-0.01],[-0.10,0.52,-0.00],[-0.09,0.49,0.00],[-0.22,0.43,0.05],[-0.24,0.44,0.04],[-0.25,0.46,0.04],[-0.26,0.48,0.05],[-0.33,0.24,0.01],[-0.81,-0.11,0.55],[-0.27,0.40,0.08],[-0.28,0.40,0.08],[-0.09,0.15,-0.10],[-0.21,0.11,-0.05],[-0.10,0.14,-0.10],[-0.28,-0.17,-0.02],[-0.41,-0.13,-0.00],[-0.24,0.03,-0.08],[-0.59,-0.87,0.03],[-0.55,-0.79,-0.03],[-0.51,-0.71,-0.07],[-0.31,0.53,0.09],[-0.19,-0.67,-0.13],[-0.20,-0.80,-0.13],[-0.22,-0.94,-0.11],[-0.50,-0.37,0.04],[-0.66,-0.30,0.12],[-0.20,-0.38,0.02],[-0.61,-0.49,0.05],[-0.16,-0.24,-0.06],[-0.17,0.04,-0.18],[-0.74,-0.25,0.18],[-0.61,-0.24,0.07],[-0.52,-0.21,0.03],[-0.39,-0.22,0.01],[-0.28,-0.25,0.00],[-0.21,-0.27,-0.01],[-0.06,-0.32,-0.12],[-0.73,-0.10,0.18],[-0.66,-0.50,0.07],[-0.02,0.14,-0.22],[-0.20,-0.13,-0.06],[-0.82,-0.42,0.47],[-0.15,-0.30,-0.02],[-0.25,0.02,-0.03],[-0.56,-0.44,0.07],[-0.18,-0.02,-0.17],[-0.78,0.07,0.55],[-0.20,-0.40,0.03],[-0.11,-0.05,-0.22],[-0.60,0.50,0.29],[-0.60,0.58,0.38],[-0.79,-0.11,0.36],[-0.67,0.38,0.33],[-0.76,-0.53,0.24],[-0.32,0.84,0.17],[-0.01,0.16,-0.15],[-0.27,-0.08,-0.03],[-0.73,-0.39,0.18],[-0.43,-0.40,0.02],[-0.37,-0.40,0.01],[-0.31,0.41,0.09],[-0.72,0.04,0.21],[-0.18,0.98,0.19],[-0.41,0.81,0.28],[-0.51,0.71,0.33],[-0.31,-0.40,0.01],[-0.25,-0.40,0.02],[-0.22,-0.40,0.03],[-0.71,-0.51,0.12],[-0.27,-0.47,0.01],[-0.34,-0.50,-0.00],[-0.40,-0.51,-0.00],[-0.46,-0.50,0.01],[-0.50,-0.48,0.02],[-0.80,-0.57,0.37],[-0.47,-0.41,0.04],[-0.25,0.21,-0.03],[-0.17,0.08,-0.12],[-0.10,0.21,-0.08],[-0.51,0.62,0.26],[-0.42,0.73,0.22],[-0.17,0.92,0.13],[-0.67,0.44,0.46],[-0.22,-0.43,0.02],[-0.10,-0.20,-0.13],[-0.31,0.91,0.23],[-0.76,0.06,0.38],[-0.16,0.46,0.02],[-0.17,0.48,0.02],[-0.19,0.52,0.01],[-0.19,0.55,0.02],[-0.23,0.61,0.07],[-0.29,0.35,0.06],[-0.30,0.34,0.06],[-0.31,0.33,0.06],[-0.39,0.28,0.06],[-0.63,0.09,0.11],[-0.10,-0.28,-0.09],[-0.15,-0.45,-0.01],[-0.19,-0.45,0.01],[-0.27,0.36,0.07],[-0.65,0.27,0.22],[-0.08,-0.44,-0.07],[-0.26,0.67,0.10],[-0.05,-0.23,-0.17],[-0.15,-0.09,-0.12],[-0.13,0.74,0.08],[-0.43,0.46,0.14],[-0.32,0.07,-0.01],[-0.36,0.57,0.13],[-0.49,0.06,0.01],[-0.39,0.14,0.02],[-0.54,0.16,0.07],[-0.16,0.83,0.09],[-0.20,-0.06,-0.08],[-0.49,0.53,0.19],[-0.40,0.64,0.17],[-0.48,0.35,0.13],[-0.70,0.17,0.25],[-0.57,0.37,0.17],[-0.73,0.22,0.38],[-0.45,0.22,0.05],[-0.15,-0.16,-0.09],[-0.15,0.07,-0.19],[-0.20,0.08,-0.13],[-0.12,0.03,-0.23],[-0.22,-0.53,-0.03],[-0.34,-0.59,-0.04],[-0.45,-0.60,-0.04],[-0.53,-0.58,-0.02],[-0.58,-0.55,0.01],[-0.61,-0.42,0.09],[-0.80,-0.25,0.34],[-0.55,-0.32,0.06],[-0.47,-0.29,0.04],[-0.38,-0.29,0.02],[-0.29,-0.31,0.01],[-0.22,-0.32,0.01],[-0.17,-0.34,0.00],[-0.82,-0.27,0.53],[-0.20,0.09,-0.10],[-0.10,-0.13,-0.17],[-0.10,0.09,-0.23],[-0.06,0.13,-0.20],[-0.10,0.10,-0.20],[-0.18,0.11,-0.08],[-0.05,0.14,-0.22],[-0.04,0.15,-0.15],[-0.18,-0.40,0.02],[-0.14,-0.38,-0.01],[-0.11,-0.35,-0.04],[-0.51,-0.46,0.04],[-0.57,-0.49,0.04],[0.36,-0.47,0.04],[0.28,-0.46,0.04],[0.35,-0.53,0.04],[0.43,-0.47,0.04],[0.36,-0.40,0.04],[-0.39,-0.45,0.03],[-0.46,-0.46,0.03],[-0.39,-0.52,0.03],[-0.31,-0.45,0.03],[-0.39,-0.39,0.03]]
   /*
   ====================================================================================
 
@@ -589,7 +638,7 @@ const Tracker = (function () {
   // Data for one face
 		constructor(tracker) {
 			super({
-				type:"Pose", 
+				type:"pose", 
 				tracker, 
 				landmarkCount:POSE_LANDMARK_COUNT, 
 				dimensionality:3
@@ -613,7 +662,7 @@ const Tracker = (function () {
 		constructor(tracker) {
 			super({
 				tracker, 
-				type:"Hand", 
+				type:"hand", 
 				landmarkCount:HAND_LANDMARK_COUNT, 
 				dimensionality:3
 			});
@@ -640,8 +689,6 @@ const Tracker = (function () {
 			super.calculateMetaTrackingData()
 
 
-
-	// console.log("hand data")
 			this.fingers.forEach((finger,index) => {
 
 
@@ -701,10 +748,7 @@ const Tracker = (function () {
 			numHands= 6,
 			numPoses= 3,
 			numFaces= 3,
-			doAcquireFaceMetrics=false,
-			doAcquirePoseMetrics=false,
-			doAcquireHandMetrics=false,
-
+			
 			modulePath,
 			modelPaths,
 
@@ -741,18 +785,15 @@ const Tracker = (function () {
 
 			this.isActive = true;
 			this.config = {
-				doAcquireFaceMetrics: true,
 				cpuOrGpuString:gpu?"GPU":CPU /* "GPU" or "CPU" */,
 				numHands,
 				numFaces,
 				numPoses,
-				doAcquireFaceMetrics,
-				doAcquireHandMetrics,
-				doAcquirePoseMetrics,
+				doAcquireFaceMetrics:numFaces>0,
+				doAcquireHandMetrics:numHands>0,
+				doAcquirePoseMetrics:numPoses>0,
 
 			};
-			// console.log(this.config)
-
 			console.log(`Tracker loaded, watching for ${numHands} hands, ${numFaces} faces, ${numPoses} poses, `)
 			this.faces = Array.from({length:numFaces}, ()=> new Face(this))
 			this.hands = Array.from({length:numHands}, ()=> new Hand(this))
@@ -773,7 +814,6 @@ const Tracker = (function () {
 		drawSource({p, flip=false, x = 0, y = 0, scale = 1.0}) {
 
 			if (this.source) {
-				// console.log(this.source.width, this.source.height)
 				p.push()
 				p.translate(x, y)
 				p.scale(scale)
@@ -842,29 +882,36 @@ const Tracker = (function () {
 			
 		}
 
-		async runAllLandmarkModels() {
-		    let data = {};
+		async detectType({type, afterLandmarkUpdate,afterMetaUpdate, afterTypeUpdate}) {
+			// Detect this type from the source
+	        let model = this.landmarkerModels[type];
+	        let trackables = this[type + "s"]
+		    let startTimeMs = performance.now();
 
-		    for (let key of ["hand", "face", "pose"]) {
-		        // Detect this model from the source
-		        let model = this.landmarkerModels[key];
-		        let startTimeMs = performance.now();
+	        if (model) {
+	            // Await the asynchronous operation
+	            let rawResult = model.detectForVideo(this.source.elt, startTimeMs)
 
-		        if (model) {
-		            // Await the asynchronous operation
-		            let detectionResult = await model.detectForVideo(this.source.elt, startTimeMs);
-
-		            // Store the raw data
-		            // Some models store it differently
-		            let lmKey = key=="face"?"faceLandmarks":"landmarks"
-		            data[key] = detectionResult[lmKey]
-		        }
-		    }
-
-		    return data;
+            	// Store the raw data
+	            // Some models store it differently
+	            let lmKey = type=="face"?"faceLandmarks":"landmarks"
+	            let result = rawResult[lmKey]
+	           
+		    	trackables.forEach((trackable, index) => {
+		    		// find the right trackable and update its landmark data
+		    		// TODO - more complicated matching?
+		    		trackable.setLandmarksFromTracker(result[index], this.sourceDimensions)
+		    		afterLandmarkUpdate?.({trackable, type, index})
+		    		trackable.calculateMetaTrackingData()
+		    		afterMetaUpdate?.({trackable, type, index})
+		    	})
+	           
+	        }
+	        afterTypeUpdate?.({trackables, type})
 		}
 
-		async detect({afterLandmarkUpdate,afterMetaUpdate}) {
+
+		async detect({afterLandmarkUpdate,afterMetaUpdate, afterTypeUpdate}) {
 			if (!this.source) {
 				console.warn("no video source provided!")
 				return
@@ -873,104 +920,15 @@ const Tracker = (function () {
 			// Make sure we are not making double predictions?
 			if (t - this.lastPredictionTime > 10) {
 
-				console.log("\nStart prediction");
-
-				// First, get the raw landmark predictions
-			    let allLandmarks = await this.runAllLandmarkModels()
-			    console.log("-  prediction complete");
-
-
-			    Object.entries(allLandmarks).forEach(([type,newLandmarkData]) => {
-			    	// Ok, we are looking at all of a type (hands, faces, etc)
-			    	// For each active landmark data we have, 
-			    	let trackables = this[type + "s"]
-			    	
-			    	trackables.forEach((trackable, index) => {
-			    		// find the right trackable and update its landmark data
-			    		let newData = newLandmarkData[index]
-			    		// The goal here is to never have a time when 
-			    		// the data has not gotten overridden via the afterLandmarkUpdate,
-			    		// e.g. if we have playback overlays
-			    		trackable.setLandmarksFromTracker(newData, this.sourceDimensions)
-			    		
-			    	})
-			    })
-
-			    afterLandmarkUpdate?.({tracker:this})
-			    		
-
-			    this.trackables.forEach(trackable => {
-			    	trackable.calculateMetaTrackingData()
-			    	
-			    })
-			    afterMetaUpdate?.({tracker:this})
-
-			    // // Assign the predicted landmarks to each trackable
-			    // ["hand", "face", "pose"].forEach(key => {
-			    // 	let allTrackables
-			    // 	this[key + 's'].forEach((trackable,index) => {
-			    // 		let data =
-			    // 		console.log(key, trackable.id)
-			    // 	})
-			    // })
+				// Run all the detectors		
+		        ["hand", "face", "pose"].forEach(type => this.detectType({type, afterLandmarkUpdate, afterMetaUpdate}))
+		    	
 			}
 
 			this.lastPredictionTime = t;
 		}
 
 
-
-	// 	async predictHand() {
-			
-	// 	}
-
-	// 	async predictFace() {
-
-	// 		let startTimeMs = performance.now();
-	// 		let data = this.landmarkers.face?.detectForVideo(this.source.elt, startTimeMs);
-		
-	// 		if (data) {
-	// 			this.faces.forEach((face, faceIndex) => {
-	// 				let landmarks = data.faceLandmarks[faceIndex];
-	// 				let blendShapes = data.faceBlendshapes[faceIndex];
-
-	// 	// Set the face to these landmarks
-	// 				if (landmarks) {
-	// 					face.isActive = true;
-	// 					face.setLandmarksFromTracker(landmarks, this.sourceDimensions);
-	// 				} else {
-	// 	  // No face active here
-	// 					face.isActive = false;
-	// 				}
-	// 			});
-	// 		}
-	// 	}
-
-	// 	async predictPose() {
-	// 		let startTimeMs = performance.now();
-	// 		let data = this.landmarkers.pose?.detectForVideo(
-	// 			this.source.elt,
-	// 			startTimeMs
-	// 			);
-
-	// 		if (data) {
-
-	  // // Set each pose to the right data
-	// 			this.poses.forEach((pose, poseIndex) => {
-	// 				let landmarks = data.landmarks[poseIndex];
-
-	// 	// Set the face to these landmarks
-	// 				if (landmarks) {
-	// 					pose.isActive = true;
-	// 					pose.setLandmarksFromTracker(landmarks, this.sourceDimensions);
-	// 				} else {
-	// 	  // No pose active here
-	// 					pose.isActive = false;
-	// 				}
-	// 			});
-	// 		}
-
-	// 	}
 
 	}
 

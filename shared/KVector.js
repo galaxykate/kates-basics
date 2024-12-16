@@ -134,6 +134,21 @@ class KVector {
   	return [this.x, this.y, this.z].map(fxn)
   }
 
+  // Remap this point between spaces
+  remap(bb0, bb1) {
+  	function remap(v, v0, v1, nv0, nv1) {
+		    let pct = (v - v0)/(v1 - v0)
+		    return pct*(nv1 - nv0) + nv0
+		}
+
+		// Is this bounding box {xywh} or [[x0,][x1,]
+
+		this.x = remap(this.x, bb0.x, bb0.x + bb0.w, bb1.x, bb1.x + bb1.w)
+		this.y = remap(this.y, bb0.y, bb0.y + bb0.h, bb1.y, bb1.y + bb1.h)
+		this.z = remap(this.z, bb0.z, bb0.z + bb0.d, bb1.z, bb1.z + bb1.d)
+		return this
+  }
+
   get angle() {
 		return Math.atan2(this.y, this.x)
 	}
@@ -481,6 +496,13 @@ class KVector {
 		return this
 	}
 
+	rotate(theta) {
+		let x = this.x
+		let y = this.y
+		this.x = x*Math.cos(theta) - y*Math.sin(theta)
+		this.y = x*Math.sin(theta) + y*Math.cos(theta)
+		return this
+	}
 
 	 /**
 	 * ===========================================================================

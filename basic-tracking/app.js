@@ -30,13 +30,8 @@ const trackerConfig = {
     createLandmark: (x, y, z) => new KVector(x, y, z) // Assuming KVector is defined
 };
 
-const DEFAULT_FRAME_RATE = 30;
 
-let tasks = [];
 let p;
-const WIDTH = 600;
-const HEIGHT = 400;
-
 let tracker = new Tracker(trackerConfig);
 
 
@@ -99,6 +94,7 @@ document.addEventListener("DOMContentLoaded", (event) => {
                   p.circle(finger.tip.x, finger.tip.y, 4*finger.pinchAmt)
                   // let pinch = Math.max(5,finger.thumbPinch.magnitude)
              
+
                
                 // if (finger.pinch) {
                 //   finger.pinch.pts.forEach(pt => {

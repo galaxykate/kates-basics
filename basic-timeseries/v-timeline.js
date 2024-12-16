@@ -1,5 +1,6 @@
 Vue.component("timeline", {
   template: `<div class="widget widget-timeline">
+  	<div>{{activeFrameIndex}}/{{frames.length}}</div>
     <div>{{start}} - {{end}}</div>
     <div ref="p5"></div>
   </div>`,
@@ -83,24 +84,28 @@ Vue.component("timeline", {
     },
 
   	draw({p}) {
+
   		// Clear and redraw the timeline
         p.background(50);
         p.fill(40);
-        this.box.draw(p);
-
+       
         let border = 2
-        for (let i = 0; i < this.frames.length; i++) {
 
+        for (let i = 0; i < this.frames.length; i++) {
+          
+          // Just draw the frames in the scene
           if (i >= this.start - border && i < this.end + border) {
             let x = this.tToX(i);
+            let fr = this.frames[i]
+            // console.log(i, x)
 
-            this.drawFrame({
-              p,
-              x,
-              frameIndex: i,
-              data: this.frames[i].data,
-              isActive: this.activeFrameIndex === i,
-            });
+            // this.drawFrame({
+            //   p,
+            //   x,
+            //   frameIndex: fr.index,
+            //   data: fr.data,
+            //   isActive: this.activeFrameIndex === i,
+            // });
           }
         }
   	},
@@ -123,8 +128,9 @@ Vue.component("timeline", {
 
       p.noStroke();
       p.fill(0);
-      p.rect(x, 10, 3, 10);
-      p.text(frameIndex, x, 40);
+      p.rect(x, 10, 1, 10);
+      p.textSize(10)
+      p.text(frameIndex, x, 30);
     },
 
     tToX(t) {

@@ -1,34 +1,70 @@
-Vue.component("dataslice-editor", {
-	template: `<div>
-		<div>{{dataslice.slices.length}}</div>
 
-		<table>
-			<tr v-for="slice in dataslice.slices">
-				<td>{{slice.stream.id}}</td>
-				<td>{{slice.length}}</td>
-				<td>{{slice.label}}</td>
-				<td>{{slice.indices}}</td>
-				<td>{{slice.dimensions}}</td>
-				<td>{{slice.flatIndices}}</td>
-			</tr>
-		</table>
+/** 
+ * Records a (probalby) normalized array of numbers, and plays them back
+ * Annotations?
+ **/
+
+class Recorder {
+	constructor({getData, setData}) {
+		this.mode = "none"
+		this.isPaused = false
+		this.activeFrameIndex = 0
+
+		this.getData = getData
+		this.setData = setData
+		this.startNewRecording()
+	}
+
+	
+	startNewRecording() {
+		this.isPaused = false
+		this.recording = new Recording()
+		this.mode = "recording"
+		this.time = 0
+	}
+
+	update({t, dt, frameCount, speed=1}) {
+		
+		// Get the time since we started this recording
+		this.time += dt*speed
+
+		switch(this.mode) {
+		case "recording": 
+
+			// Every frame, get all the numbers, labels, etc, and store them
+			this.recording.frames.push({
+				metadata: {
+					index: Recorder.frameCount++,
+					time: this.time
+				},
+				data: this.getData()
+			})
+			this.recording.frames = this.recording.frames.slice(-30)
+			this.activeFrameIndex = this.recording.frames.length
+			break
+		case "playback": 
+			let frame = undefined // TODO
+			this.setData(frame.data, frame.metadata)
+		} 
 
 		
-	</div>`,
+	}
+}
 
-	mounted() {
-		
-	},
-
-	props: { dataslice: { required: true }}
-});
-
+Recorder.frameCount = 0
 
 class Recording {
 	constructor({uid,startedOn, frames}={}) {
+		
 		this.uid = uid || uuidv4()
 		this.startedOn = startedOn || Date.now()
 		this.frames = frames || []
+
+		
+	}
+
+	get saveData() {
+		return []
 	}
 
 	toRawData() {
@@ -47,16 +83,6 @@ class Recording {
 			}
 		})
 	}
-
-	recordFrame(dataSlice, time) {
-		if (dataSlice == undefined)
-			console.warn("Trying to record dead frame")
-		this.frames.push({
-			time: time||Date.now(),
-			index: this.frames.length,
-			data:dataSlice
-		})
-	}
 }
 
 /**
@@ -70,17 +96,17 @@ Vue.component("data-recorder", {
 	template: `<div class="widget widget datarecorder" >
 		RECORDER
 		<div>
-			mode:{{mode}}
-			<span v-if="isPaused">(paused)</span>
+			mode:{{recorder.mode}}
+			<span v-if="recorder.isPaused">(paused)</span>
 		</div>
 		<div v-if="recording" class="section">
 			RECORDING: {{recording.id}}
-				<div>filesize: {{saveData.length}}, {{recording.frames.length*slice.size}}</div>
-				<textarea ref="savedata" @input="loadData" :value="saveData" /><button @click="copyToClipboard">copy to clipboard</button>
-			
+				
+				
 			<timeline 
+
 				:frames="recording.frames" 
-				:activeFrameIndex="activeFrameIndex" 
+				:activeFrameIndex="recorder.activeFrameIndex" 
 				mode="contain"
 				@focus="startControl" 
 				@blur="stopControl"
@@ -92,63 +118,37 @@ Vue.component("data-recorder", {
 		
 	</div>`,
 	computed: {
-
+		recording() {
+			return this.recorder.recording
+		}
 
 	},
 
 	watch: {
 
 
-		"globalTime.frameCount"() {
-			// console.log("new frame!", this.globalTime.frameCount)
-			// Record or playback
-			if (!this.isPaused && this.recording) {
-
-				switch(this.mode) {
-
-					case "playback":
-						this.incrementPlayback()
-						break;
-
-					case "recording":
-						this.recordFrame()
-						break;
-				}
-			}
-		},
-
 		
 	},
 
-	computed: {
-		frameCount() {
-			return this.recording.frames.length
-		}
-	},
+
 	methods: {
+		startControl() {
 
-		incrementPlayback() {
+		},
+
+		stopControl() {
+
+		},
+
+		setTimespan() {
+
+		},
+
+		setActiveFrame() {
 			
-			let newFrameIndex = (this.activeFrameIndex + 1)%this.frameCount
-			this.setActiveFrame(newFrameIndex)
-			return this
 		},
 
-		recordFrame() {
-			this.recording.recordFrame(this.slice.currentArray) 
-			this.activeFrameIndex = this.frameCount - 1
-			this.saveData = this.recording.toRawData()
-			return this
-		},
 
-		loadData() {
-			let raw = this.$refs.savedata.value
-			this.recording = new Recording().fromRawData(raw)
-			
-			this.startNewRecording({frames})
-			return this
-
-		},
 
 		copyToClipboard() {
 			 const textarea = this.$refs.savedata; // Reference the textarea
@@ -157,45 +157,8 @@ Vue.component("data-recorder", {
 		    console.log("copy?")
 		},
 
-		setActiveFrame(activeFrameIndex) {
-			if (this.recording) {
-				this.activeFrameIndex = activeFrameIndex
-				let activeFrame = this.recording.frames[this.activeFrameIndex]
-				this.slice.setOverlay(activeFrame)
-			}
-		},
+	
 
-		setTimespan({start,end}) {
-			// console.log(start, end)
-		},
-
-		startNewRecording({frames}={}) {
-			console.log("Starting a new recording...");
-	        this.activeFrameIndex = 0
-			this.mode = "recording"
-			this.isPaused = false
-			this.recording = new Recording()
-		},
-
-		startControl() {
-			console.log("start control")
-			this.isPaused = true
-			this.mode = "playback"
-			// this.mode = "control"
-		},
-
-		stopControl() {
-			// Go pack to playback, but paused
-			// this.isPaused = true
-			
-		},
-
-
-		startPlayback() {
-			// Set the data slice's overlay
-			// As we change the current frame, the slice uses this value instead
-			
-		},
 
 		handleKeydown(event) {
 			
@@ -215,11 +178,11 @@ Vue.component("data-recorder", {
 					// use R to toggle recording
 					// Shift R to start a new recording
 					 if (event.shiftKey || this.recording === undefined) {
-                    	this.startNewRecording();
+                    	this.recorder.startNewRecording();
 	                } else {
 	                    console.log("Toggling recording...");
-	                    this.isPaused = !this.isPaused;
-	                   	this.mode = "recording"
+	                    this.recorder.isPaused = !this.recorder.isPaused;
+	                   	this.recorder.mode = "recording"
 	                }
 	                break;
 				}
@@ -231,22 +194,20 @@ Vue.component("data-recorder", {
 
 	mounted() {
 		window.addEventListener("keydown", this.handleKeydown);
-		this.startNewRecording()
+	
 	},
 
 	data() {
-		return {
-			recording: undefined,
-			mode:"none",
-			activeFrameIndex:0,
-			isPaused: true,
-			saveData:"",
-		}
+		return {}
 	},
 	
 	props: { 
 
-		globalTime: {},
-		slice:{} 
+		recorder:{
+
+		},
+			
+
+		
 	}
 });

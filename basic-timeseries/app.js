@@ -5,84 +5,54 @@
 /* globals Vue, p5, Tracker */
 // GLOBAL VALUES, CHANGE IF YOU WANT
 
-const MUSIC_SCHEMA = new StreamSchema({
-	id: "fftmusic",
-	count: 100,
-	dim: 1,
-	range: [0,256],
-})
-
-const HSLA_SCHEMA = new StreamSchema({
-	id: "hsla360",
-	dim: 4,
-	ranges: [[0,360], [0,100], [0,100], [0,1]],
-})
-
-const RGB_SCHEMA = new StreamSchema({
-	id: "rgb256",
-	dim: 3,
-	range: [0, 256],
-})
-
-const TRACKABLE_SCHEMA = new StreamSchema({
-	id: "trackable",
-	dim: 3,
-	dimensionKeys: ["x", "y", "z"],
-	range: [-100, 100],
-})
-
-// Get the body/face/hand tracker
-	
-let tracker = new Tracker({
-    maxHistory: 10,
-    numHands: 2,
-    numPoses: 0,
-    numFaces: 1,
-    doAcquireFaceMetrics: true,
-    doAcquirePoseMetrics: true,
-    doAcquireHandMetrics: true,
-    modulePath: "../vendor/mediapipe/",
-    modelPaths: {
-        face: "../vendor/mediapipe/face_landmarker.task",
-        hand: "../vendor/mediapipe/hand_landmarker.task",
-        // pose: "../vendor/mediapipe/"
-    },
-    gpu: true,
-    createLandmark: (x, y, z) => new KVector(x, y, z) // Assuming KVector is defined
-})
-
-
 
 
 let app = {
 	
 
-	tracker,
+	tracker:new Tracker({
+	    maxHistory: 10,
+	    numHands: 2,
+	    numPoses: 0,
+	    numFaces: 1,
+	    modulePath: "../vendor/mediapipe/",
+	    modelPaths: {
+	        face: "../vendor/mediapipe/face_landmarker.task",
+	        hand: "../vendor/mediapipe/hand_landmarker.task",
+	        // pose: "../vendor/mediapipe/"
+	    },
+	    gpu: true,
+	    createLandmark: (x, y, z) => new KVector(x, y, z) // Assuming KVector is defined
+		}),
+	streams: [],
+	time:new AppTime(),
+	fusion: new DataFusion(),
+	recorder: new Recorder({
+		getData() {
+			return app.fusion.array
+		},
+		setData(data) {
+			// do something with this data
+		}
+	}),
 
-	// What trackables do we have?
-	// stuff with different inputs
-	// dataFusion: new DataFusion(),
-	dataSlice: new DataSlice(),
-
-
-
-	streams: [
-		// new Stream({id:"music", schema:MUSIC_SCHEMA}),
-		// new Stream({id:"color0", schema:HSLA_SCHEMA, count:3}),
-		// new Stream({id:"color1", schema:RGB_SCHEMA, count:5}),
-		new Stream({
-				id:"hand0", 
-				schema: TRACKABLE_SCHEMA, 
-				data: tracker.hands[0].landmarks
-			})
-	],
-
+	// Various streams
+	streams: {
+		music: new DataStream({
+			schema: SCHEMA.fftmusic
+		}),
+		color0: new DataStream({
+			count: 3,
+			schema: SCHEMA.rgb256,
+		}),
+		color1: new DataStream({
+			count: 4,
+			schema: SCHEMA.hsla360,
+		}),
+	},
 	
-	
-
 	init({p}) {
-
-		// Create teh capture
+		// Initialize the p5 capture
 		createP5Capture({p}).then(capture => {
 			this.tracker.source = capture
 			this.tracker.isActive = true
@@ -93,82 +63,68 @@ let app = {
         })
 
 
-		// Make some slices
-		this.streams.forEach(stream => {
-			this.dataSlice.addStreamSlice({
+		this.tracker.trackables.forEach(tr => {
+			let id = tr.id
+			this.streams[id] = new DataStream({
+				source: tr,
+				count: tr.landmarks.length,
+				schema: SCHEMA.trackable,
+				data: tr.landmarks
+			})
+		})
+		
+		// Give then the id (useful for debugging)
+		Object.entries(this.streams).forEach(([key, stream]) => {
+    		stream.id = key;
+		});
+
+		// Create a datafusion out of some test set of the streams
+		// IRL we might have any number of slices (e.g, eyes, fingers, etc)
+		Object.values(this.streams).map(stream => {
+			let indices = undefined
+			if (stream.id.includes("face")) {
+				indices = {start:0,end:10}
+			}
+			if (stream.id.includes("music"))
+				indices = [2,3,5,6,10,11]
+				
+			this.fusion.addSlice({
+				id: stream.id,
 				stream,
-				label: stream.id + "_0",
-				indices: [0,stream.length],
-				dimensions: stream.dimensions
+				indices
 			})
 		})
 
-		// Make some starting data
-		for (var i = 0; i < 30; i++) {
-			this.time.t += .1
-			this.streams.forEach((stream,index) => {
-				stream.schema.setToNoise({data: stream.data, t:this.time.t + index*.1, offset:index})
-			})
-			this.dataSlice.update(this.time)
-		}
-
 	},
 
+	
 	async update() {
 		this.time.update()
 
 		// Update the landmarks based on the tracker, but then override them with any data
+		this.tracker.detect({
+			afterLandmarkUpdate: ({trackable, type}) => {
+				// Ok, we just updated the trackable from the MediaPipe detection model
+				// Now we need to apply any playback overlays on it
 
-		await this.tracker.detect({
-			afterLandmarkUpdate: ({newData, tracker, trackable}) => {
-				console.log("  after landmark, but before meta")
-				// Playback the trackers
+				if (this.recorder.activeFrame) {
+					let stream = this.streams.find(str => str.source === trackable)
+					this.recorder.applyToStream(stream)
+				}
+				
 			}
 		})
+		
+		// Set some streams to noise
 
+		this.streams.music.setToNoise(this.time.t*2)
+		this.streams.color0.setToNoise(this.time.t*2)
+		this.streams.color1.setToNoise(this.time.t*2)
 
-
-		console.log(" -  finished tracker stuff")
-					
-		// console.log(this.tracker.source, this.tracker.trackables)
-
-		// Set evertyhing to noise
-		// this.streams.forEach((stream,index) => {
-		// 	stream.schema.setToNoise({data: stream.data, t:this.time.t, offset:index})
-		// })
-
-
-
-		// This dataslice may have its own overlay, controlled by the recorder, 
-		// and be writing to the world
-		// Or it might be drawing data from the world
-		this.dataSlice.update(this.time)
-
-		// Oh no, the trackables are asynchronous... so I need to turn them off if they have an overlay? 
-		// Or make sure the overlay fires afterward
+		this.fusion.update(this.time)
+		this.recorder.update(this.time)
 	},
 
-	time:{
-		start: Date.now(),
-		t: 0,
-		dt: 0,
-		frameCount:0,
-		lastUpdate: Date.now(),
-		update(dt) {
-			let now = Date.now()
-			// Did we gain time?
-			if (dt === undefined) {
-				// update in realtime
-				let elapsed = now - this.lastUpdate
-				this.lastUpdate = now
-				dt = elapsed*.001
-			}
-			
-			this.dt = dt
-			this.t += dt
-			this.frameCount++
-		}
-	}
 }
 
 
@@ -179,22 +135,27 @@ document.addEventListener("DOMContentLoaded", (event) => {
 	new Vue({
 		template: `<div id="app">
 			<div class="columns"> 
-				<div class="column">
-					<dataslice :slice="slice" /> 
-					<data-recorder 
-						:slice="app.dataSlice" 
-						:globalTime="app.time"
-					/>
+				<div class="column">	
+					<div>{{app.time.t.toFixed(4)}}</div>
+					<data-recorder :recorder="app.recorder" /> 				
+					<datastreams :streams="app.streams" /> 				
+					<datafusion :fusion="app.fusion" /> 
 				</div>
 
-				<div class="column">
-					
-					<div ref="p5" />	
-					
+				<div class="column">	
+					<button @click="printTrackerPos">print trackerpos</button>				
+					<div ref="p5" />						
 				</div>
 			</div>
 		</div>`,
-
+		methods: {
+			printTrackerPos() {
+				let arr = app.tracker.faces[0].axisNormalizedLandmarks
+				console.log(arr.length)
+				let text = arrayOfArraysToFixed(arr, 3)
+				console.log(text)
+			}
+		},
 
 		mounted() { 
 			// Create processing
@@ -208,47 +169,53 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
 					p.background(100)
 
-					let x = 0
-					let y = 0
-					let size = 10
-					this.app.streams.forEach(stream => {
-						stream.data.forEach((item,i) => {
-							let data = stream.schema.normalizeItem(item)
-							data.forEach((v,j) => {
-								p.fill(v*100)
-								p.rect(x + size*i, y + size*j, size, size)
-							})
-							if (stream.schema.id == "hsla360") {
-								p.fill(...item)
-								p.rect(x + size*i, y + size*4 + 3, size, size)
-							}
-							if (stream.schema.id == "rgb256") {
-								p.colorMode(p.RGB)
-								p.fill(...item)
-								p.rect(x + size*i, y + size*3 + 3, size, size)
-								p.colorMode(p.HSLA)
-							}
-						})
-
-
-
-						y += size*stream.dim + 20
-						// console.log(y)
-					})
-
-
-					// this.app.tracker.trackables.map(tr => console.log(tr.id, tr.isActive))
+					// Draw the tracker
 					let trackerDrawing = {
 						flip:true,
-						scale: .6,
-						x: 10,
-						y: 120.
+						scale: .6, x: 10,y: 120.
 					}
 
-					console.log("  draw landmarks")
-					// We dont know when the prediction is happening
 					this.app.tracker.drawSource({p, ...trackerDrawing})
 					this.app.tracker.drawDebugData({p, ...trackerDrawing})
+
+
+					// app.streams.color1.data.forEach((c,i) => {
+					// 	p.fill(c[0], c[1]*.3 + 60, c[2]*.5 + 30)
+					// 	p.circle(30*i, 30, 50)
+					// })
+
+					let face = app.tracker.faces[0]
+					// console.log(app.tracker.source)
+					let lmks = face.screenNormalizedLandmarks
+					let lmks2 = face.boundingBoxNormalizedLandmarks
+					let lmks3 = face.axisNormalizedLandmarks
+
+					p.push()
+					p.fill(100)
+					p.stroke(0)
+					p.rect(0, 0, 200, 200)
+					p.translate(100, 100)
+
+					// p.noStroke()
+					// p.fill(0)
+					// lmks.forEach(pt => p.circle(pt.x*100, pt.y*75, 2))
+					
+
+					// p.noStroke()
+					// p.fill(200, 100, 50)
+					// lmks2.forEach(pt => p.circle(pt.x*100, pt.y*75, 2))
+					
+					p.noStroke()
+					p.fill(300, 100, 50)
+					// lmks3.forEach(pt => p.circle(pt.x*100, pt.y*100, 2))
+					
+					p.noStroke()
+					p.fill(340, 100, 50)
+
+					// Tracker.FACE_MAPPING_POSITIONS.forEach(pt => p.circle(pt[0]*100, pt[1]*100, 2))
+					
+					p.pop()
+					// console.log(arrayOfArraysToFixed(lmks3, 2))
 				}, 
 				setup(p) {
 

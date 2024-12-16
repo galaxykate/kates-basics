@@ -1,22 +1,29 @@
-function drawData({p, x, y, data, size=10, horizontal=false}) {
+function drawData({p, x, y, w=10,h=10,data,  horizontal=false}) {
     if (!data)
         throw("No data: " + data)
+
+    if (data.length == 0)
+        throw("No data: " + data)
+    p.stroke(0, 0, 0, .3)
+    p.strokeWeight(1)
     let dim = data[0].length || 1
     for (var i = 0; i < data.length; i++) {
         for (var j = 0; j < dim; j++) {
             let v = Array.isArray(data[i])?data[i][j]:data[i]
             p.fill(v * 100);
-            let x2 = size * i
-            let y2 = size * j
+            let x2 = i
+            let y2 = j
             if (horizontal) 
                 x2 = [y2, y2=x2][0] // hack to swap values
 
-            p.rect(x2 + x, y2 + y, size, size);
-        }
+            p.rect(x2*w + x, y2*h + y, w, h);
+        }h
     }
-    return dim*size
 }
 
+function arrayOfArraysToFixed(arr, n) {
+    return "[" + (arr.map(a => arrayToFixed(a, n))).join(",") + "]"
+}
 
 function arrayToFixed(arr, n) {
     return "[" + (arr.map(a => a.toFixed(2))).join(",") + "]"
@@ -74,9 +81,38 @@ function formatDate(timestamp) {
   return `${datePart}, ${timePart}`;
 }
 
+class AppTime {
+    constructor() {
+        let t = Date.now()
+        this.start = t
+        this.t = 0
+        this.dt = 0
+        this.frameCount = 0
+        this.lastUpdate = t
+        this.maxElapsed = .1
+        this.paused = false
+        this.rate = 1
+    }
+
+    update(t) {
+
+        t = t ?? Date.now()
+        let elapsed = t - this.lastUpdate
+
+        this.lastUpdate = t
+        this.fps = 1/elapsed
+        elapsed = Math.min(this.maxElapsed, elapsed)
+        if (!this.paused) {
+            this.dt = elapsed*this.rate
+            this.t += this.dt
+            this.frameCount++
+        }
+    }
+}
+
 
 class Box {
-    constructor({x, y, w, h, x1, y1}) {
+    constructor({x, y, w, h, x1, y1, z, z1, d}) {
         if (isNaN(x) || isNaN(y)) {
             throw new Error("Invalid box definition");
         }
@@ -84,14 +120,18 @@ class Box {
             // Define the box with width and height
             this.x0 = x;
             this.y0 = y;
+            this.z0 = z;
             this.x1 = x + w;
             this.y1 = y + h;
+            this.z1 = z + d;
         } else if (!isNaN(x1) && !isNaN(y1)) {
             // Define the box with two points
             this.x0 = x;
             this.y0 = y;
+            this.z0 = z;
             this.x1 = x1;
             this.y1 = y1;
+            this.z1 = z1;
         } else {
             throw new Error("Invalid box definition");
         }
@@ -107,11 +147,18 @@ class Box {
     get h() {
         return this.y1 - this.y0
     }
+    get d() {
+        return this.z1 - this.z0
+    }
     get x() {
         return this.x0
     }
     get y() {
         return this.y0
+    }
+
+    get z() {
+        return this.z0
     }
     
 
@@ -130,6 +177,13 @@ class Box {
     get yMax() {
         return Math.max(this.y0, this.y1);
     }
+     get zMin() {
+        return Math.min(this.z0, this.z1);
+    }
+
+    get zMax() {
+        return Math.max(this.z0, this.z1);
+    }
 
     get xRange() {
         return this.xMax -  this.xMin
@@ -137,6 +191,15 @@ class Box {
 
     get yRange() {
         return this.yMax -  this.yMin
+    }
+
+    get zRange() {
+        return this.zMax -  this.zMin
+    }
+
+    toBoxSpaceFromNormalized(v, v0) {
+        v0 = v0 ?? new v.prototype.constructor()
+        v0.x = this.x + this.width*v.x
     }
 
     getPct(pt) {
