@@ -172,50 +172,57 @@ document.addEventListener("DOMContentLoaded", (event) => {
 					// Draw the tracker
 					let trackerDrawing = {
 						flip:true,
-						scale: .6, x: 10,y: 120.
+						scale: 1, x: 0,y: 0,
+						drawIndices: true
 					}
 
 					this.app.tracker.drawSource({p, ...trackerDrawing})
-					this.app.tracker.drawDebugData({p, ...trackerDrawing})
-
-
-					// app.streams.color1.data.forEach((c,i) => {
-					// 	p.fill(c[0], c[1]*.3 + 60, c[2]*.5 + 30)
-					// 	p.circle(30*i, 30, 50)
-					// })
+					// this.app.tracker.drawDebugData({p, ...trackerDrawing})
 
 					let face = app.tracker.faces[0]
-					// console.log(app.tracker.source)
-					let lmks = face.screenNormalizedLandmarks
-					let lmks2 = face.boundingBoxNormalizedLandmarks
-					let lmks3 = face.axisNormalizedLandmarks
 
-					p.push()
-					p.fill(100)
+					app.tracker.activeTrackables.forEach(trackable => {
+						trackable.landmarks.forEach((pt,i) => {
+							// console.log(pt)
+							p.fill(100, 100, 50)
+							p.noStroke()
+							p.circle(pt.x, pt.y, 10)
+
+							p.stroke(100)
+							// Draw lines to neighbors
+						
+							trackable.constructor.MAP[i]?.neighbors.forEach(neighbor => {
+								let pt2 = trackable.landmarks[neighbor.index]
+							
+								// pt.drawLineTo({p, pt:pt2})
+
+							})
+
+							p.stroke(100, 100, 50)
+							pt.drawLineTo({p, v:pt.dir0, multiplyLength:20})
+							p.stroke(300, 100, 50)
+							pt.drawLineTo({p, v:pt.dir1, multiplyLength:20})
+						})
+
+					})
+					
+
+
 					p.stroke(0)
-					p.rect(0, 0, 200, 200)
-					p.translate(100, 100)
+					// console.log(face.constructor.MAP)
+					face.constructor.MAP.forEach(pt => {
+						
+						p.circle(pt.x*100, pt.y*100, 2)
+						pt.neighbors?.forEach(pt2 => {
+							// console.log(pt2)
+							pt.drawLineTo({p, pt:pt2})
 
-					// p.noStroke()
-					// p.fill(0)
-					// lmks.forEach(pt => p.circle(pt.x*100, pt.y*75, 2))
+						})
+					})
 					
-
-					// p.noStroke()
-					// p.fill(200, 100, 50)
-					// lmks2.forEach(pt => p.circle(pt.x*100, pt.y*75, 2))
-					
-					p.noStroke()
-					p.fill(300, 100, 50)
-					// lmks3.forEach(pt => p.circle(pt.x*100, pt.y*100, 2))
-					
-					p.noStroke()
-					p.fill(340, 100, 50)
-
-					// Tracker.FACE_MAPPING_POSITIONS.forEach(pt => p.circle(pt[0]*100, pt[1]*100, 2))
-					
-					p.pop()
 					// console.log(arrayOfArraysToFixed(lmks3, 2))
+
+					
 				}, 
 				setup(p) {
 

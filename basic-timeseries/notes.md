@@ -7,6 +7,11 @@ have a set of inputs of arrays-of-arrays than can be fused into a single data fo
 ----
 Dec 16
 
+Created dir0, dir1, and axis0, axis1 ([v0,v1]) for all trackables, and dir0,dir1 for all landmarks, so we can do orientations
+
+----
+Dec 16
+
 ----
 Dec 15
 

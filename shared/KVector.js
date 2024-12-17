@@ -329,7 +329,7 @@ class KVector {
 	}
 
 
-	setToOffset(pt1, pt0) {
+	setToDifference(pt1, pt0) {
 		this.x = pt0.x - pt1.x
 		this.y = pt0.y - pt1.y
 		this.z = pt0.z - pt1.z
@@ -526,9 +526,23 @@ class KVector {
 		p.circle(this.x, this.y, radius)
 	}
 
-	drawLineTo({p, v, multiplyLength=1, normalOffset=0,  startOffset=0, endOffset=0, color}) {
+	drawLineTo({p, pt, v, 
+			multiplyLength=1, 
+			n0=0,  n1=0, m0=0, m1=0, 
+			color, 
+			arrowHeadStart=0, arrowHeadEnd=0}) {
 			// TODO normal and offsets
-			p.line(this.x, this.y, v.x, v.y) 
+
+			let dx = pt?pt.x - this.x:v.x*multiplyLength
+			let dy = pt?pt.y - this.y:v.y*multiplyLength
+			let d = Math.sqrt(dx*dx, dy*dy)
+
+
+			p.line(
+				this.x + m0*dx/d + n0*dy/d, 
+				this.y + m0*dy/d + -n0*dx/d,
+				this.x + dx + -m1*dx/d + n1*dy/d, 
+				this.y + dy + -m1*dy/d + -n1*dy/d)
 	}
 		
 	drawArrow({p, v, multiplyLength=1, normalOffset=0,  startOffset=0, endOffset=0, color, headSize=10}) {
