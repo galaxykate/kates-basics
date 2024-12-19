@@ -53,7 +53,7 @@ const Tracker = (function () {
 			10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 164, 0, 11, 12, 13, 14,
 			15, 16, 17, 18, 200, 199, 175, 152,
 			],
-		mouth: [
+		mouthRings: [
 			[
 				287, 436, 426, 327, 326, 2, 97, 98, 206, 216, 57, 43, 106, 182, 83, 18,
 				313, 406, 335, 273,
@@ -573,7 +573,7 @@ const Tracker = (function () {
 				this[key] = this.createMetaVector(key)
 			})
 
-
+			let getLandmarks = i => this.landmarks[i]
 
 
 	// Easy access
@@ -581,7 +581,9 @@ const Tracker = (function () {
 			this.nose = this.landmarks[CONTOURS.centerLine[9]]
 			this.chin = this.landmarks[CONTOURS.centerLine[26]]
 			
-
+			this.centerLine = CONTOURS.centerLine.map(getLandmarks)
+			this.mouthRings = CONTOURS.mouthRings.map(ring => ring.map(getLandmarks))
+			
 			this.side = [{},{}]
 			this.side.forEach((side,i) => {
 				let sideKeys = ["irisDir",
@@ -594,7 +596,7 @@ const Tracker = (function () {
 				})
 
 				side.irisCenter = this.landmarks[CONTOURS.sides[i].irisCenter]
-				side.irisRing = CONTOURS.sides[i].irisRing.map(i => this.landmarks[i])
+				side.irisRing = CONTOURS.sides[i].irisRing.map(getLandmarks)
 
 	  // Set up names for some side landmarks
 				side.ear = this.landmarks[CONTOURS.sides[i].faceRings[0][8]]

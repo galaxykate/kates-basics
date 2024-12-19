@@ -373,6 +373,7 @@ function createTHREE({w=200,h=200, el, update}) {
     }
 
     animate();
+    return {scene, camera, renderer}
 }
 
 
