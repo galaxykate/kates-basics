@@ -556,20 +556,21 @@ function createP5Capture({p}) {
      * so wrap it in a promise
      **/
 
-    // start creating the capture
-
+    // start creating (and hiding) the capture
     let capture = p.createCapture(p.VIDEO)
-    console.log(capture)
-
     capture.hide()
-    console.log("Create capture!", capture.width, capture.height)
-
+   
     return new Promise((resolve, reject) => {
+       
         let count = 0
         let maxCount = 250
         const intervalId = setInterval(() => {
-            if (capture.elt.width > 0) 
+            if (capture.elt.width > 0)  {
+                console.log("Create P5 capture!", capture.width, capture.height)
+                clearInterval(intervalId);   
                 resolve(capture)
+            }
+               
             else if (count >= maxCount) {
                 clearInterval(intervalId);
                 reject("Capture timeout!")
@@ -577,36 +578,6 @@ function createP5Capture({p}) {
             count++;
         }, 40)
     })
-
-    // We have to wait until P5 has started the capture,
-    // - but it doesn't give us a callback, so we're doing it the bad way by waiting
-    let count = 0;
-    const maxCount = 100;
-    const interval = 50;
-    const intervalId = setInterval(() => {
-
-      if (this.capture.elt.width > 0) {
-      // WE HAVE A CAPTURE
-      // If the condition is met, stop the loop
-
-        clearInterval(intervalId);
-        console.log("Condition met, stopping loop.");
-
-      // Set our video source
-        this.video = this.capture
-
-      // NOW start tracking
-        this.initTracking();
-      }
-
-      else if (count >= maxCount) {
-      // If 100 iterations have occurred without meeting the condition, stop the loop
-        clearInterval(intervalId);
-        console.warn("No capture created");
-      }
-
-      count++;
-    }, interval);
 }
 
 function makePixelsOutsideCircleTransparent(img, cx, cy, radius) {

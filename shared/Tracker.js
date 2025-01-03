@@ -212,7 +212,6 @@ const Tracker = (function () {
 		static MAP = []
 
 		static calculateMap() {
-			console.log("STATIC Calculate map", this.name, this.POSITIONS)
 			
 			if (this.POSITIONS ) {
 				let positions  = this.POSITIONS.map((v,i) => {
@@ -254,7 +253,6 @@ const Tracker = (function () {
 	  
 
 		constructor({type, tracker, dimensionality=3}) {
-			console.log("landmark count",type, this.constructor.LANDMARK_COUNT)
 			this.type = type
 			this.tracker = tracker
 
