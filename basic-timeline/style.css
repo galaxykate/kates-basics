@@ -1,0 +1,192 @@
+body {
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+
+#app {
+ z-index: 50;
+ flex: 1; /* To allow the container to grow and consume the available space */
+ display: flex;
+ flex-direction: column;
+ overflow: hidden;
+}
+
+main {
+  flex: 1; /* To allow main to grow and consume the available space */
+
+}
+
+.canvas-holder {
+  position: relative;
+  background-color: grey;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+.chip {
+  display: inline-block;
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+
+.columns {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+}
+
+.column {
+  display: flex;
+  border: 2px solid blue;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+button {
+  font-size: 16px;
+  margin: 2px;
+}
+
+button.active {
+  background-color: hsl(100, 100%, 50%);
+}
+
+
+canvas {
+  position: relative;
+  margin: 10px;
+  border: 1px solid rgba(0, 0, 0, .2);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, .5);
+}
+
+.widget {
+
+  border: 1px solid grey;
+  margin: .2em;
+  padding: .1em .3em;
+  border-radius:.5em;
+}
+.chip{
+  flex: 0 0 auto;
+  display: inline-flex;
+  border: 1px solid grey;
+  padding: .1em .3em;
+  border-radius:5em;
+}
+
+.bargraph {
+  /* border: 3px solid green; */
+  display: flex; /* Ensure flex layout */
+}
+
+.bargraph.horizontal {
+  flex-direction: row; /* Arrange cells in a row */
+}
+
+.item {
+  display: inline-flex;
+  flex: 1; /* Each item takes equal space */
+  padding: 2px;
+  margin: 3px;
+  /* border: 1px solid blue; */
+
+  justify-content: center;
+  align-items: center;
+}
+
+.bargraph .cell {
+  position: relative;
+  padding: 1px;
+  flex: 1; /* Ensure all cells take equal width */
+  height: 30px;
+  max-width: 10px;
+  min-width: 3px; /* Prevent collapse */
+  background-color: lightgray; /* Add a background to visualize */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bargraph .cell > .fill {
+  width: 100%;
+  height: 50%;
+  background-color: rgba(255, 0, 0, 0.7);
+  position: absolute; /* Allows bottom alignment */
+  bottom: 0; /* Ensures it starts at the bottom */
+  left: 0;
+
+}
+
+.recorder-widget {
+  width: 300px;
+  height: 200px;
+  display: flex;
+  flex-direction: row;
+}
+
+.mini-info {
+  padding: 1px;
+  margin: 2px;
+  background-color: hsla(100, 0%, 90%, 1);
+  max-width: 100px;
+  font-size: 40%;
+}
+
+.row {
+  display: flex;
+
+  flex-direction: row;
+}
+
+.active-record {
+  border-radius: 10px;
+  background-color: hsla(100, 100%, 80%, 1);
+  border: 2px solid hsla(100, 100%, 30%, 1);
+  width: 300px;
+  height: 200px;
+  display: flex;
+  flex-direction: row;
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, .3);
+}
+
+.active-record.paused {
+  border-style: dashed;
+}
+
+.active-record.recording {
+
+  background-color: hsla(180, 100%, 80%, 1);
+  border-color:  hsla(180, 100%, 30%, 1);
+}

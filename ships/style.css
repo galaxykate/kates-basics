@@ -1,0 +1,177 @@
+body {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+.chip {
+  display: inline-block;
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+
+.subtitle {
+  font-style: italic;
+  font-size: 50%;
+}
+
+.columns {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+}
+
+.column {
+  display: flex;
+  border: 2px solid blue;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#app {
+ z-index: 50;
+ flex: 1; /* To allow the container to grow and consume the available space */
+ display: flex;
+ flex-direction: column;
+ overflow: hidden;
+}
+
+main {
+  flex: 1; /* To allow main to grow and consume the available space */
+
+}
+
+.overlay {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+}
+
+.canvas-holder {
+  position: relative;
+  background-color: grey;
+}
+
+
+button {
+  /* font-size: 16px;
+  margin: 2px; */
+}
+
+button.active {
+  /* background-color: hsl(100, 100%, 50%); */
+}
+
+
+canvas {
+  position: relative;
+}
+
+.widget {
+  position: relative;
+  
+}
+
+.controls {
+  padding: 3px;
+  margin: 4px;
+  border-radius: 10px;
+  background-color: grey;
+  /* border: 3px solid cyan; */
+  position: relative;
+  overflow: hidden;
+}
+
+.grid-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 3px solid magenta;
+}
+
+.grid-header, .grid-footer {
+  text-align: center;
+  font-weight: bold;
+  background: lightgray;
+  padding: 10px;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: repeat(var(--frame-count, 30), 1fr); /* Evenly distributes frames */
+  width: 100%;
+  border-bottom: 1px solid gray;
+}
+
+.grid-cell {
+  border: 1px solid green;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 5px;
+}
+
+.piano-keyboard {
+  position: relative;
+  z-index: 20;
+  padding: 10px;
+  
+}
+
+
+.piano-keyboard button {
+  border-radius: 10px;
+}
+ 
+
+.keyboard-keys {
+  position: relative;
+  z-index: 20;
+  padding: 10px;
+  width: 640px;
+  height: 100px;
+  background-color: darkslategrey;
+}
+
+.piano-key {
+  font-size: 50%;
+  z-index: 50;
+  display: inline-block;
+  position: absolute;
+  width: 20px;
+  height: 70px;
+  color: black;
+  border: 1px solid black;
+  background-color: white;
+}
+
+.piano-key.black {
+  z-index: 100;
+  width: 16px;
+  height: 50px;
+  color: white;
+  background-color: black;
+}
+
+.piano-key.active {
+ 
+  background-color: orange;
+}
+

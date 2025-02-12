@@ -9,7 +9,6 @@
 
 let app = {
 	
-
 	tracker:new Tracker({
 	    maxHistory: 10,
 	    numHands: 2,
