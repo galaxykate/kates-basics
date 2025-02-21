@@ -1,0 +1,168 @@
+body {
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+
+#app {
+ z-index: 50;
+ flex: 1; /* To allow the container to grow and consume the available space */
+ display: flex;
+ flex-direction: column;
+ overflow: hidden;
+}
+
+main {
+  flex: 1; /* To allow main to grow and consume the available space */
+
+}
+
+.canvas-holder {
+  position: relative;
+  background-color: grey;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  flex-direction: column; /* Stack the children vertically */
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+h3 {
+  margin: 7px 0px 0px 0px;
+}
+.chip {
+  display: inline-block;
+  box-shadow: 0px 2px 3px rgba(0, 0, 0, .4);
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+
+.columns {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+}
+
+.column {
+  display: flex;
+  border: 2px solid blue;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+
+.card {
+  transition: transform 400ms cubic-bezier(0.760, -0.385, 0.400, 1.550); /* custom */
+
+  width: 100px;
+  padding: 2px;
+  border: 2px solid hsla(30, 100%, 100%, 1);
+  background-color: hsla(30, 100%, 90%, 1);
+  border-radius: 10px;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, .4);
+  position: absolute;
+  display: inline-block;
+  transform: scale(1, 1);
+  z-index: 10;
+}
+
+
+.card.held {
+  z-index: 100;
+  /* transform: scale(1.2, 1.2); */
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, .8);
+}
+
+
+.card .tarot-img {
+ 
+  width: 100px;
+
+}
+
+
+#layer1 {
+  transform: translate(0px, 200px) scale(.2, .2) ;
+}
+
+path {
+  stroke-width: 2px;
+  transition: all 0.2s ease;
+}
+
+
+path:hover {
+  stroke-width: 9px;
+  filter: drop-shadow(2px 3px 4px rgb(255, 0, 170));
+  /* transform: scale(1.01, 1.01); */
+  stroke-dasharray: 10;
+  stroke-dashoffset: 0;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+
+/* Default styles before hover */
+/* Use "nth child" with ODDD and EVEN and multiples 
+  to style lots of things differently
+  Note that SVG paths need "stroke and fill" 
+  instead of "border and background" for HTML elements
+  */
+path:nth-of-type(odd) {
+  stroke: red;
+  fill: hsla(100, 100%, 50%, .4);
+}
+
+path:nth-of-type(even) {
+  stroke: blue;
+  fill: hsla(30, 100%, 50%, .4);
+}
+
+path:nth-of-type(3n) {
+  stroke: purple;
+  fill: hsla(210, 100%, 50%, .4);
+}
+
+/* Hover Effects: Change each group differently */
+path:nth-of-type(odd):hover {
+  stroke: black;
+  fill: hsla(188, 100%, 50%, 0.7);
+}
+
+path:nth-of-type(even):hover {
+  stroke: white;
+  fill: hsla(320, 100%, 70%, .6);
+}
+
+path:nth-of-type(3n):hover {
+  stroke: lime;
+  fill: hsla(350, 100%, 80%, .6);
+}

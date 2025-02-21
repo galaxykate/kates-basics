@@ -679,8 +679,19 @@ class KVector {
 		return [h1, s1, b1]
 	}
 
-	toCSS({shade=0, fade=0, hueShift=0}) {
+	toCSSColor({shade=0, fade=0, hueShift=0}) {
 		return hslToCSS(this.getColor({shade,fade, hueShift}))
+	}
+	
+	get cssPosition() {
+		return {
+			left: this.x.toFixed(2) + "px",
+			top: this.y.toFixed(2) + "px",
+		}
+	}
+	
+	get cssTranslate() {
+		return `translate(${this.x.toFixed(2)}px, ${this.y.toFixed(2)}px)`
 	}
 	
 

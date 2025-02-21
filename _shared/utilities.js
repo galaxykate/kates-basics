@@ -496,88 +496,156 @@ function setAtPath(obj, path, val) {
     lastObj[lastKey] = val
 }
 
-function createTHREE({w=200,h=200, el, update}) {
+/**
+ * Doing mouse interactions on various objects, where we care about XY positions 
+
+ * 
+ * 
+ */
+
+class OrbitalCamera extends THREE.Object3D {
+    constructor({w, h, radius, phi, theta, renderer}) {
+        super();
+        this.r = radius;
+        this.phi = phi;
+        this.theta = theta;
+        this.renderer = renderer;
+        
+        this.camera = new THREE.PerspectiveCamera(75, w/h, 0.1, 1000);
+        
+        // Attach the camera to this Object3D (itself a scene object)
+        this.position.set(0, 0, 0);
+        this.camera.position.set(0, 0, radius);
+        this.add(this.camera);
+        
+        this.isDragging = false;
+        this.previousMouseX = 0;
+        this.previousMouseY = 0;
+
+        this.renderer.domElement.addEventListener("mousedown", this.onMouseDown.bind(this));
+        document.addEventListener("mouseup", this.onMouseUp.bind(this));
+        document.addEventListener("mousemove", this.onMouseMove.bind(this));
+
+        this.updateCameraPosition()
+    }
+    
+    updateCameraPosition() {
+        // Apply rotation to the parent object
+       this.rotation.z = this.theta;
+        this.rotation.x = this.phi;
+        this.rotation.order = "ZXY";
+        
+        
+        // this.rotation.eulerOrder = "XYZ"
+        // Move the camera along the orbital radius
+        this.camera.position.set(0, 0, this.r);
+        this.updateMatrixWorld(true);
+    }
+
+    set({theta, phi,radius}) {
+        this.r = radius??this.r
+        this.theta = theta??this.theta
+        this.phi = phi??this.phi
+        this.updateCameraPosition()
+        return this
+    }
+
+    offset({theta=0, phi=0,radius=0}) {
+        this.r += radius
+        this.theta += theta
+        this.phi += phi
+        this.updateCameraPosition()
+         return this
+    }
+    onMouseDown(event) {
+        if (event.target !== this.renderer.domElement) return;
+        this.isDragging = true;
+        this.previousMouseX = event.clientX;
+        this.previousMouseY = event.clientY;
+    }
+    
+    onMouseUp() {
+        this.isDragging = false;
+    }
+    
+    onMouseMove(event) {
+        if (!this.isDragging) return;
+        
+        let deltaX = event.clientX - this.previousMouseX;
+        let deltaY = event.clientY - this.previousMouseY;
+        
+        this.theta -= deltaX * 0.01;
+        this.phi -= deltaY * 0.01;
+        
+        this.phi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, this.phi));
+        
+        this.previousMouseX = event.clientX;
+        this.previousMouseY = event.clientY;
+        
+        this.updateCameraPosition();
+    }
+
+   
+}
+
+function createTHREE({w=200,h=200, el, update, setup, addTestGeo, addLights=true}) {
     // Create a scene
     const scene = new THREE.Scene();
-
-    // Create a camera
-    const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
-    camera.position.z = 5;
 
     // Create a renderer and add it to the document
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(w, h);
     el.appendChild(renderer.domElement);
 
-    // Add a box geometry and a basic material
-    const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-
-    // Add a basic ambient light
-    const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft white light
-    scene.add(ambientLight);
-
-    // Add a point light
-    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(10, 10, 10);
-    scene.add(pointLight);
-
-    // Variables for orbital controls
-    let isDragging = false;
-    let previousMousePosition = {
-        x: 0,
-        y: 0
-    };
-
-    const toRadians = angle => angle * (Math.PI / 180);
-    const toDegrees = angle => angle * (180 / Math.PI);
-
-    document.addEventListener('mousedown', (event) => {
-        isDragging = true;
-    });
-
-    document.addEventListener('mousemove', (event) => {
-        if (mouse.isDown)
-            isDragging = true;
-            
-        if (isDragging) {
-            const deltaMove = {
-                x: event.offsetX - previousMousePosition.x,
-                y: event.offsetY - previousMousePosition.y
-            };
-
-            const deltaRotationQuaternion = new THREE.Quaternion()
-                .setFromEuler(new THREE.Euler(
-                    toRadians(deltaMove.y * 0.1),
-                    toRadians(deltaMove.x * 0.1),
-                    0,
-                    'XYZ'
-                ));
-
-            cube.quaternion.multiplyQuaternions(deltaRotationQuaternion, cube.quaternion);
+    if (addTestGeo) {
+        // Add a box geometry and a basic material
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
+    
+        for (var i = 0; i < 100; i++) {
+            let r = 20
+            let cube = new THREE.Mesh(geometry, material);
+            cube.position.set(Math.random()*r*2 - r, Math.random()*r*2 - r, Math.random()*r)
+            scene.add(cube);
         }
 
-        previousMousePosition = {
-            x: event.offsetX,
-            y: event.offsetY
-        };
-    });
+        let cube = new THREE.Mesh(geometry, material);
+        cube.scale.set(100, 100, 1)
+        scene.add(cube);
+    }
 
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        // Release the drag wherever we are
-    });
+    /**
+     * LIGHTS
+     */
+
+    if (addLights) {
+        // Add a basic ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft white light
+        scene.add(ambientLight);
+
+        // Add a point light
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+    }
+
+    const camera = new OrbitalCamera({w, h, radius:100, phi:.9, theta:2.4, renderer})
+
 
     // Animation loop
     function animate() {
+        update({renderer, camera, scene})
+        // console.log(app.time.t)
         requestAnimationFrame(animate);
+      
+        camera.updateMatrixWorld(true);
+        camera.camera.updateMatrixWorld(true);
+        renderer.render(scene, camera.camera);
 
-        renderer.render(scene, camera);
     }
 
     animate();
+    setup?.({scene, camera, renderer})
     return {scene, camera, renderer}
 }
 
